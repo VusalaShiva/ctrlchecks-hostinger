@@ -1,0 +1,28 @@
+[Unit]
+Description=CtrlChecks Notification Service
+Documentation=https://github.com/ctrlchecks/ctrlchecks-ai-workflow-os
+After=network.target ctrlchecks-worker.service
+Wants=ctrlchecks-worker.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/ctrlchecks-notification-service
+ExecStart=/usr/bin/node dist/index.js
+EnvironmentFile=/opt/ctrlchecks-notification-service/.env
+Restart=always
+RestartSec=10
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+# Phase 1 scaffold — minimal footprint (email + in-app in Phase 2)
+MemoryMax=512M
+LimitNOFILE=65536
+
+# Stdout/stderr go to journald (sudo journalctl -u ctrlchecks-notification-service)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ctrlchecks-notification-service
+
+[Install]
+WantedBy=multi-user.target

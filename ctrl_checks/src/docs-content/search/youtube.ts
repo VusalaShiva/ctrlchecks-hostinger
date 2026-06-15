@@ -1,0 +1,68 @@
+import type { DocsSearchIndexItem } from '../search-index';
+
+export const youtubeSearchIndex = [
+  {
+    type: 'node',
+    title: 'YouTube',
+    slug: 'youtube',
+    category: 'Communication',
+    href: '/docs/nodes/youtube',
+    text: 'YouTube read upload update delete videos with OAuth2 connection',
+  },
+  {
+    type: 'operation',
+    title: 'YouTube: List my channels',
+    slug: 'youtube',
+    category: 'Communication',
+    href: '/docs/nodes/youtube#operation-list_my_channels',
+    text: 'list_my_channels authenticated channel list maxResults',
+  },
+  {
+    type: 'operation',
+    title: 'YouTube: Get channel',
+    slug: 'youtube',
+    category: 'Communication',
+    href: '/docs/nodes/youtube#operation-get_channel',
+    text: 'get_channel channelId authenticated channel details',
+  },
+  {
+    type: 'operation',
+    title: 'YouTube: Search videos',
+    slug: 'youtube',
+    category: 'Communication',
+    href: '/docs/nodes/youtube#operation-search_videos',
+    text: 'search_videos query maxResults channelId search YouTube videos',
+  },
+  {
+    type: 'operation',
+    title: 'YouTube: Get video statistics',
+    slug: 'youtube',
+    category: 'Communication',
+    href: '/docs/nodes/youtube#operation-get_video_stats',
+    text: 'get_video_stats videoId statistics views likes video',
+  },
+  {
+    type: 'operation',
+    title: 'YouTube: Upload video',
+    slug: 'youtube',
+    category: 'Communication',
+    href: '/docs/nodes/youtube#operation-upload_video',
+    text: 'upload_video videoUrl videoDataBase64 title description tags privacyStatus youtube.upload',
+  },
+  {
+    type: 'operation',
+    title: 'YouTube: Update video metadata',
+    slug: 'youtube',
+    category: 'Communication',
+    href: '/docs/nodes/youtube#operation-update_video_metadata',
+    text: 'update_video_metadata videoId title description tags',
+  },
+  {
+    type: 'operation',
+    title: 'YouTube: Delete video',
+    slug: 'youtube',
+    category: 'Communication',
+    href: '/docs/nodes/youtube#operation-delete_video',
+    text: 'delete_video videoId delete owned YouTube video',
+  },
+] satisfies DocsSearchIndexItem[];

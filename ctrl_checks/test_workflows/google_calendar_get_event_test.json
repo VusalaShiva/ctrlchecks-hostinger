@@ -1,0 +1,63 @@
+{
+  "name": "Google Calendar - Get Event Test",
+  "description": "Test getting a specific event by ID. Replace eventId with an actual event ID from your calendar.",
+  "nodes": [
+    {
+      "id": "node_1",
+      "type": "custom",
+      "position": { "x": 100, "y": 100 },
+      "data": {
+        "type": "manual_trigger",
+        "label": "Start Test",
+        "category": "triggers",
+        "icon": "Play",
+        "config": {}
+      }
+    },
+    {
+      "id": "node_2",
+      "type": "custom",
+      "position": { "x": 300, "y": 100 },
+      "data": {
+        "type": "google_calendar",
+        "label": "Get Event",
+        "category": "productivity",
+        "icon": "Calendar",
+        "config": {
+          "resource": "event",
+          "operation": "get",
+          "calendarId": "primary",
+          "eventId": "REPLACE_WITH_ACTUAL_EVENT_ID"
+        }
+      }
+    },
+    {
+      "id": "node_3",
+      "type": "custom",
+      "position": { "x": 500, "y": 100 },
+      "data": {
+        "type": "log_output",
+        "label": "View Event",
+        "category": "output",
+        "icon": "FileOutput",
+        "config": {
+          "message": "Event: {{$json.summary}} - {{$json.start.dateTime}}",
+          "level": "info"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_1",
+      "source": "node_1",
+      "target": "node_2"
+    },
+    {
+      "id": "edge_2",
+      "source": "node_2",
+      "target": "node_3"
+    }
+  ],
+  "viewport": { "x": 0, "y": 0, "zoom": 1 }
+}

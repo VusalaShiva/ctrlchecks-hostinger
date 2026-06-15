@@ -1,0 +1,26 @@
+Template catalog refresh — execution order
+========================================
+
+1) Optional: backup public.templates (pg_dump or SELECT copy).
+
+2) Run in Supabase SQL editor or psql:
+   ctrl_checks/sql_migrations/templates_refresh/00_delete_all_templates.sql
+   This nulls workflows.template_id and deletes all template rows.
+
+3) Run seed batches in order (each file is one transaction: BEGIN/COMMIT):
+   01_seed_templates_batch_1_of_10.sql
+   02_seed_templates_batch_2_of_10.sql
+   ... through ...
+   10_seed_templates_batch_10_of_10.sql
+
+4) Regenerate batches after editing node lists or counts:
+   From ctrl_checks folder:
+   npx tsx scripts/generate-workflow-templates-sql.ts
+
+Constants TOTAL and PER_FILE are at the top of generate-workflow-templates-sql.ts.
+
+Notes
+-----
+- created_by uses the first admin in user_roles, else the oldest auth.users row (same pattern as 27_insert_templates_directly.sql).
+- Middle steps use only 1-in / 1-out style nodes so graphs stay strictly linear (no if/switch/merge in the chain).
+- For selective delete instead of full wipe, use ctrl_checks/sql_migrations/23_safe_delete_admin_templates.sql as a reference.

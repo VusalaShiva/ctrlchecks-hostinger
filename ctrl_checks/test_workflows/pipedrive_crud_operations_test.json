@@ -1,0 +1,211 @@
+{
+  "name": "Pipedrive CRUD Operations Test",
+  "description": "Test workflow demonstrating Create, Read, Update, Delete operations",
+  "nodes": [
+    {
+      "id": "node_1",
+      "type": "custom",
+      "position": { "x": 100, "y": 100 },
+      "data": {
+        "type": "manual_trigger",
+        "label": "Start CRUD Test",
+        "category": "triggers",
+        "icon": "Play",
+        "config": {}
+      }
+    },
+    {
+      "id": "node_2",
+      "type": "custom",
+      "position": { "x": 300, "y": 100 },
+      "data": {
+        "type": "pipedrive",
+        "label": "1. Create Deal",
+        "category": "crm",
+        "icon": "Database",
+        "config": {
+          "apiToken": "8e7859815042f259e7f26086ed5abe8d9431290e",
+          "resource": "deal",
+          "operation": "create",
+          "dealTitle": "Test Deal from ctrlchecks - CRUD Test",
+          "dealValue": 15000,
+          "dealCurrency": "USD",
+          "status": "open"
+        }
+      }
+    },
+    {
+      "id": "node_3",
+      "type": "custom",
+      "position": { "x": 500, "y": 100 },
+      "data": {
+        "type": "pipedrive",
+        "label": "2. Get Deal (by ID)",
+        "category": "crm",
+        "icon": "Database",
+        "config": {
+          "apiToken": "8e7859815042f259e7f26086ed5abe8d9431290e",
+          "resource": "deal",
+          "operation": "get",
+          "dealId": "{{data.id}}"
+        }
+      }
+    },
+    {
+      "id": "node_4",
+      "type": "custom",
+      "position": { "x": 700, "y": 100 },
+      "data": {
+        "type": "pipedrive",
+        "label": "3. Update Deal",
+        "category": "crm",
+        "icon": "Database",
+        "config": {
+          "apiToken": "8e7859815042f259e7f26086ed5abe8d9431290e",
+          "resource": "deal",
+          "operation": "update",
+          "dealId": "{{data.id}}",
+          "dealTitle": "Updated Deal Title from ctrlchecks",
+          "dealValue": 20000
+        }
+      }
+    },
+    {
+      "id": "node_5",
+      "type": "custom",
+      "position": { "x": 300, "y": 300 },
+      "data": {
+        "type": "pipedrive",
+        "label": "4. Create Person",
+        "category": "crm",
+        "icon": "Database",
+        "config": {
+          "apiToken": "8e7859815042f259e7f26086ed5abe8d9431290e",
+          "resource": "person",
+          "operation": "create",
+          "personName": "Test Person from ctrlchecks",
+          "personEmail": "test.person@ctrlchecks.com",
+          "personPhone": "+1234567890"
+        }
+      }
+    },
+    {
+      "id": "node_6",
+      "type": "custom",
+      "position": { "x": 500, "y": 300 },
+      "data": {
+        "type": "pipedrive",
+        "label": "5. Create Organization",
+        "category": "crm",
+        "icon": "Database",
+        "config": {
+          "apiToken": "8e7859815042f259e7f26086ed5abe8d9431290e",
+          "resource": "organization",
+          "operation": "create",
+          "orgName": "Test Organization from ctrlchecks",
+          "orgAddress": "123 Test Street, Test City"
+        }
+      }
+    },
+    {
+      "id": "node_7",
+      "type": "custom",
+      "position": { "x": 700, "y": 300 },
+      "data": {
+        "type": "pipedrive",
+        "label": "6. Create Activity",
+        "category": "crm",
+        "icon": "Database",
+        "config": {
+          "apiToken": "8e7859815042f259e7f26086ed5abe8d9431290e",
+          "resource": "activity",
+          "operation": "create",
+          "activitySubject": "Test Activity from ctrlchecks",
+          "activityType": "meeting",
+          "dueDate": "2026-02-20 14:00:00"
+        }
+      }
+    },
+    {
+      "id": "node_8",
+      "type": "custom",
+      "position": { "x": 900, "y": 300 },
+      "data": {
+        "type": "pipedrive",
+        "label": "7. Create Note",
+        "category": "crm",
+        "icon": "Database",
+        "config": {
+          "apiToken": "8e7859815042f259e7f26086ed5abe8d9431290e",
+          "resource": "note",
+          "operation": "create",
+          "noteContent": "This is a test note created from ctrlchecks workflow automation platform.",
+          "pinnedToDealFlag": false
+        }
+      }
+    },
+    {
+      "id": "node_9",
+      "type": "custom",
+      "position": { "x": 500, "y": 500 },
+      "data": {
+        "type": "log_output",
+        "label": "CRUD Test Complete",
+        "category": "output",
+        "icon": "FileOutput",
+        "config": {
+          "message": "CRUD operations test completed! Check individual node outputs for created/updated records.",
+          "level": "info"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_1",
+      "source": "node_1",
+      "target": "node_2"
+    },
+    {
+      "id": "edge_2",
+      "source": "node_2",
+      "target": "node_3"
+    },
+    {
+      "id": "edge_3",
+      "source": "node_3",
+      "target": "node_4"
+    },
+    {
+      "id": "edge_4",
+      "source": "node_1",
+      "target": "node_5"
+    },
+    {
+      "id": "edge_5",
+      "source": "node_5",
+      "target": "node_6"
+    },
+    {
+      "id": "edge_6",
+      "source": "node_6",
+      "target": "node_7"
+    },
+    {
+      "id": "edge_7",
+      "source": "node_7",
+      "target": "node_8"
+    },
+    {
+      "id": "edge_8",
+      "source": "node_4",
+      "target": "node_9"
+    },
+    {
+      "id": "edge_9",
+      "source": "node_8",
+      "target": "node_9"
+    }
+  ],
+  "viewport": { "x": 0, "y": 0, "zoom": 0.7 }
+}

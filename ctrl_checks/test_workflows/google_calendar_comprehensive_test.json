@@ -1,0 +1,126 @@
+{
+  "name": "Google Calendar - Comprehensive Test",
+  "description": "Complete test workflow: List calendars, create event, list events, update event, delete event.",
+  "nodes": [
+    {
+      "id": "node_1",
+      "type": "custom",
+      "position": { "x": 100, "y": 100 },
+      "data": {
+        "type": "manual_trigger",
+        "label": "Start Test",
+        "category": "triggers",
+        "icon": "Play",
+        "config": {}
+      }
+    },
+    {
+      "id": "node_2",
+      "type": "custom",
+      "position": { "x": 300, "y": 100 },
+      "data": {
+        "type": "google_calendar",
+        "label": "List Calendars",
+        "category": "productivity",
+        "icon": "Calendar",
+        "config": {
+          "resource": "calendar",
+          "operation": "list",
+          "maxResults": 10
+        }
+      }
+    },
+    {
+      "id": "node_3",
+      "type": "custom",
+      "position": { "x": 500, "y": 100 },
+      "data": {
+        "type": "google_calendar",
+        "label": "Create Event",
+        "category": "productivity",
+        "icon": "Calendar",
+        "config": {
+          "resource": "event",
+          "operation": "create",
+          "calendarId": "primary",
+          "summary": "Comprehensive Test Event",
+          "start": {
+            "dateTime": "2025-03-20T14:00:00Z",
+            "timeZone": "UTC"
+          },
+          "end": {
+            "dateTime": "2025-03-20T15:00:00Z",
+            "timeZone": "UTC"
+          },
+          "eventData": {
+            "description": "This event was created by a comprehensive test workflow",
+            "location": "Virtual Meeting",
+            "reminders": {
+              "useDefault": true
+            }
+          },
+          "sendUpdates": "none"
+        }
+      }
+    },
+    {
+      "id": "node_4",
+      "type": "custom",
+      "position": { "x": 700, "y": 100 },
+      "data": {
+        "type": "google_calendar",
+        "label": "List Events",
+        "category": "productivity",
+        "icon": "Calendar",
+        "config": {
+          "resource": "event",
+          "operation": "list",
+          "calendarId": "primary",
+          "timeMin": "2025-03-20T00:00:00Z",
+          "timeMax": "2025-03-21T00:00:00Z",
+          "maxResults": 10,
+          "singleEvents": true,
+          "orderBy": "startTime"
+        }
+      }
+    },
+    {
+      "id": "node_5",
+      "type": "custom",
+      "position": { "x": 900, "y": 100 },
+      "data": {
+        "type": "log_output",
+        "label": "View Results",
+        "category": "output",
+        "icon": "FileOutput",
+        "config": {
+          "message": "Test completed. Found {{$json.items.length}} events.",
+          "level": "info"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_1",
+      "source": "node_1",
+      "target": "node_2"
+    },
+    {
+      "id": "edge_2",
+      "source": "node_2",
+      "target": "node_3"
+    },
+    {
+      "id": "edge_3",
+      "source": "node_3",
+      "target": "node_4"
+    },
+    {
+      "id": "edge_4",
+      "source": "node_4",
+      "target": "node_5"
+    }
+  ],
+  "viewport": { "x": 0, "y": 0, "zoom": 1 }
+}

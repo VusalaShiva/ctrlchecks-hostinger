@@ -1,0 +1,98 @@
+{
+  "name": "Biology Educational Content - Google Veo to YouTube",
+  "description": "Automated workflow: Generate biology content with LLM → Create video with Google Veo → Upload to YouTube daily at 9 AM",
+  "nodes": [
+    {
+      "id": "node_1",
+      "type": "schedule",
+      "position": { "x": 100, "y": 100 },
+      "data": {
+        "type": "schedule",
+        "label": "Daily 9 AM Trigger",
+        "category": "triggers",
+        "icon": "Clock",
+        "config": {
+          "time": "09:00",
+          "timezone": "America/New_York"
+        }
+      }
+    },
+    {
+      "id": "node_2",
+      "type": "openai_gpt",
+      "position": { "x": 300, "y": 100 },
+      "data": {
+        "type": "openai_gpt",
+        "label": "Generate Biology Content",
+        "category": "ai",
+        "icon": "Brain",
+        "config": {
+          "apiKey": "YOUR_OPENAI_API_KEY",
+          "model": "gpt-4o",
+          "prompt": "Generate comprehensive biology chapter content for Class 9 students about cell structure. Include:\n1. Detailed descriptions of cell organelles (nucleus, mitochondria, ribosomes, etc.)\n2. Visual descriptions suitable for creating educational diagrams\n3. Key concepts and explanations\n4. Content formatted for video narration\n\nMake it engaging and educational, suitable for 9th-grade students.",
+          "temperature": 0.7,
+          "maxTokens": 2000
+        }
+      }
+    },
+    {
+      "id": "node_3",
+      "type": "google_veo",
+      "position": { "x": 500, "y": 100 },
+      "data": {
+        "type": "google_veo",
+        "label": "Generate Video",
+        "category": "ai",
+        "icon": "Video",
+        "config": {
+          "apiKey": "YOUR_GOOGLE_VEO_API_KEY",
+          "prompt": "Create an educational video with animated diagrams showing: {{input.response}}. Include labeled cell organelles, clear visual explanations, and engaging animations suitable for Class 9 biology students.",
+          "duration": 60,
+          "style": "educational_diagram",
+          "resolution": "1080p",
+          "pollInterval": 5,
+          "timeout": 300
+        }
+      }
+    },
+    {
+      "id": "node_4",
+      "type": "youtube",
+      "position": { "x": 700, "y": 100 },
+      "data": {
+        "type": "youtube",
+        "label": "Upload to YouTube",
+        "category": "social_media",
+        "icon": "Play",
+        "config": {
+          "apiKey": "YOUR_YOUTUBE_API_KEY",
+          "accessToken": "YOUR_YOUTUBE_OAUTH_TOKEN",
+          "operation": "upload_video",
+          "videoUrl": "{{input.videoUrl}}",
+          "title": "Biology Class 9: Cell Structure - {{$now}}",
+          "description": "Educational video about cell structure for Class 9 students. Generated content:\n\n{{node_2.response}}\n\n#Biology #Class9 #Education #CellStructure",
+          "tags": "biology, class9, education, cell structure, science, tutorial",
+          "privacyStatus": "public"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_1",
+      "source": "node_1",
+      "target": "node_2"
+    },
+    {
+      "id": "edge_2",
+      "source": "node_2",
+      "target": "node_3"
+    },
+    {
+      "id": "edge_3",
+      "source": "node_3",
+      "target": "node_4"
+    }
+  ],
+  "viewport": { "x": 0, "y": 0, "zoom": 1 }
+}

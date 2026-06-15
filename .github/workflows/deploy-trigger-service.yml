@@ -1,0 +1,131 @@
+name: Deploy Trigger Service
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - 'services/trigger-service/**'
+      - 'scripts/deploy-trigger-service.sh'
+      - 'scripts/ctrlchecks-trigger-service.service'
+      - '.github/workflows/deploy-trigger-service.yml'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force deploy even without path changes'
+        required: false
+        default: 'false'
+
+concurrency:
+  group: deploy-trigger-service
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Type-check & test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/trigger-service
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: services/trigger-service/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npm run type-check
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: trigger-service-dist
+          path: |
+            services/trigger-service/dist/
+            services/trigger-service/package.json
+            services/trigger-service/package-lock.json
+          retention-days: 1
+
+  deploy:
+    name: Deploy to EC2
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: trigger-service-dist
+          path: services/trigger-service/
+
+      - name: Write SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/ctrlchecks.pem
+          chmod 600 ~/.ssh/ctrlchecks.pem
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Package and upload
+        run: |
+          tar -czf /tmp/trigger-service-deploy.tar.gz \
+            -C services/trigger-service \
+            dist/ package.json package-lock.json
+          scp -i ~/.ssh/ctrlchecks.pem \
+            /tmp/trigger-service-deploy.tar.gz \
+            ubuntu@${{ secrets.EC2_HOST }}:/tmp/trigger-service-deploy.tar.gz
+          scp -i ~/.ssh/ctrlchecks.pem \
+            scripts/ctrlchecks-trigger-service.service \
+            ubuntu@${{ secrets.EC2_HOST }}:/tmp/ctrlchecks-trigger-service.service
+
+      - name: Extract, install, restart
+        run: |
+          ssh -i ~/.ssh/ctrlchecks.pem ubuntu@${{ secrets.EC2_HOST }} bash << 'REMOTE'
+            set -euo pipefail
+            TARGET=/opt/ctrlchecks-trigger-service
+
+            # Update systemd unit if changed
+            if ! diff -q /tmp/ctrlchecks-trigger-service.service \
+                 /etc/systemd/system/ctrlchecks-trigger-service.service &>/dev/null 2>&1; then
+              sudo cp /tmp/ctrlchecks-trigger-service.service \
+                      /etc/systemd/system/ctrlchecks-trigger-service.service
+              sudo systemctl daemon-reload
+              echo "systemd unit updated"
+            fi
+            rm -f /tmp/ctrlchecks-trigger-service.service
+
+            tar -xzf /tmp/trigger-service-deploy.tar.gz -C "$TARGET"
+            rm /tmp/trigger-service-deploy.tar.gz
+
+            cd "$TARGET"
+            npm ci --omit=dev
+            sudo systemctl restart ctrlchecks-trigger-service
+            sleep 5
+
+            curl -fsS http://localhost:3006/health/live \
+              && echo "health/live OK" \
+              || (sudo journalctl -u ctrlchecks-trigger-service -n 30 --no-pager && exit 1)
+            curl -fsS http://localhost:3006/health/ready \
+              && echo "health/ready OK" \
+              || exit 1
+          REMOTE
+
+      - name: Clean up SSH key
+        if: always()
+        run: rm -f ~/.ssh/ctrlchecks.pem
+
+# Required GitHub Secrets:
+#   EC2_SSH_PRIVATE_KEY — contents of ctrlchecks-backend.pem
+#   EC2_HOST            — 3.7.115.58 (or the instance's domain)

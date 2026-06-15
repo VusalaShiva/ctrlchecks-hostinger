@@ -1,0 +1,736 @@
+/**
+ * UNIFIED NODE CONTRACT - Single Source of Truth
+ * 
+ * This is the PERMANENT CORE ARCHITECTURE for all nodes.
+ * Every node in the system MUST conform to this contract.
+ * 
+ * This contract ensures:
+ * - Single source of truth (NodeRegistry)
+ * - No hardcoded node logic in execution engine
+ * - Automatic validation from schema
+ * - Backward compatibility via migrations
+ * - Infinite scalability (500+ node types)
+ */
+
+import type { FieldHelpCategory } from '../utils/field-help-metadata';
+
+export type FieldFillMode = 'manual_static' | 'runtime_ai' | 'buildtime_ai_once';
+export type FieldOwnershipClass = 'structural' | 'value' | 'credential';
+export type FieldImportanceLevel = 'required' | 'conditionally_required' | 'recommended' | 'optional' | 'advanced';
+export type FieldEmptyValueMeaning = 'unset' | 'zero' | 'empty_string' | 'null' | 'invalid' | 'provider_default';
+export type RuntimeInputSource =
+  | 'static_config'
+  | 'template'
+  | 'deterministic_runtime'
+  | 'runtime_ai'
+  | 'field_directive_ai'
+  | 'credential'
+  | 'system';
+
+export type FinalResolvedInputs = Record<string, unknown>;
+export type RuntimeInputOwnership =
+  | 'manual_static'
+  | 'buildtime_ai_once'
+  | 'runtime_ai'
+  | 'credential'
+  | 'system';
+
+export interface RuntimeInputHandoffAudit {
+  nodeId: string;
+  nodeType: string;
+  fieldName: string;
+  ownership: RuntimeInputOwnership;
+  expectedRole?: string;
+  resolvedSource?: RuntimeInputSource;
+  resolvedValuePreview: unknown;
+  finalProviderValuePreview: unknown;
+  validationStatus: 'valid' | 'invalid';
+  handoffStatus: 'delivered' | 'missing' | 'mismatch' | 'accepted_empty_provider_default' | 'not_applicable';
+  blockedReason?: string;
+}
+
+export interface ProviderExecutionContext {
+  finalResolvedInputs: FinalResolvedInputs;
+  resolvedInputSources: Record<string, RuntimeInputSource>;
+  fieldContracts?: NodeInputSchema;
+  operationContract?: NodeOperationContract;
+  operation?: string;
+  credentials?: Record<string, unknown>;
+  rawUpstreamInput?: unknown;
+  lineageContext?: Record<string, unknown>;
+  handoffAudit?: RuntimeInputHandoffAudit[];
+}
+export type RuntimeValidationFormat =
+  | 'non_empty'
+  | 'email_list'
+  | 'a1_range'
+  | 'row_values'
+  | 'object_payload'
+  | 'conditions'
+  | 'switch_cases'
+  | 'code'
+  | 'url'
+  | 'enum'
+  | 'number'
+  | 'boolean'
+  | 'array_min_length';
+export type RuntimeValueRole =
+  | 'recipient'
+  | 'subject'
+  | 'body'
+  | 'row_values'
+  | 'object_payload'
+  | 'condition'
+  | 'switch_cases'
+  | 'code'
+  | 'query'
+  | 'filter'
+  | 'url'
+  | 'range'
+  | 'identifier'
+  | 'credential_ref'
+  | 'generic';
+export type RuntimeValueCardinality =
+  | 'single'
+  | 'list'
+  | 'table_rows'
+  | 'object'
+  | 'repeated_blocks'
+  | 'code_string';
+export type RuntimeRepairStrategy =
+  | 'extract_email'
+  | 'object_to_row_values'
+  | 'clear_invalid_optional'
+  | 'derive_title'
+  | 'derive_body'
+  | 'derive_condition';
+export type FieldValidationHintTrigger =
+  | 'missing'
+  | 'empty'
+  | 'zero'
+  | 'invalid_type'
+  | 'use_case_mismatch';
+export type FieldRelevanceLevel = 'required' | 'recommended' | 'optional' | 'advanced' | 'not_applicable';
+export type FieldRelevanceSource = 'registry' | 'operation_contract' | 'dependency_rule' | 'behavior_test' | 'inferred';
+export type FieldRiskLevel = 'none' | 'low' | 'medium' | 'high';
+
+export interface FieldRelevanceResult {
+  relevance: FieldRelevanceLevel;
+  shouldAskUser: boolean;
+  shouldShowInOwnership: boolean;
+  reason: string;
+  riskIfEmpty?: FieldRiskLevel;
+  suggestedValue?: unknown;
+  source: FieldRelevanceSource;
+  /** Guidance-ready semantic role inferred from registry metadata and field shape. */
+  fieldRole?: string;
+  /** Selected operation context for this field, when the node has operation-like behavior. */
+  operationRole?: string;
+  /** Plain-language summary of the immediate upstream dependency for this field/node. */
+  upstreamDependency?: string;
+  /** Plain-language summary of the immediate downstream dependency for this field/node. */
+  downstreamDependency?: string;
+  /** What happens when this field is missing or empty for the selected workflow. */
+  emptyBehavior?: string;
+  /** Why an incorrect value changes execution, routing, data, or output quality. */
+  wrongValueRisk?: string;
+  /** Direct user action guidance for the current relevance result. */
+  userAction?: string;
+  /** Internal QA signals used by coverage reports and guidance quality tests. */
+  guidanceQualitySignals?: {
+    specificity: 'strong' | 'partial' | 'fallback';
+    usesStructuredMetadata: boolean;
+    usesInferenceFallback: boolean;
+    missingFacts?: string[];
+    warnings?: string[];
+  };
+}
+
+export interface FieldIntelligence {
+  /** Plain-language purpose of the field inside the node. */
+  purpose: string;
+  /** Runtime truth: what the executor/provider does when this field is absent, empty, or defaulted. */
+  runtimeBehavior?: {
+    whenMissing?: string;
+    whenEmpty?: string;
+    backendDefault?: unknown;
+    emptyValueMeaning?: FieldEmptyValueMeaning;
+  };
+  /** Product-level importance, distinct from bare schema required/optional. */
+  importance?: {
+    base: FieldImportanceLevel;
+    dangerousIfEmpty?: boolean;
+    dangerousIfWrong?: boolean;
+    dependsOnUseCase?: boolean;
+  };
+  /** User-safe defaults the AI may recommend when the backend default is not product-safe. */
+  safeDefaults?: Array<{
+    value: unknown;
+    when: string;
+    reason: string;
+  }>;
+  /** Use-case-sensitive guidance for generation, validation, and setup UI. */
+  useCaseNotes?: Array<{
+    when: string;
+    importance: 'required' | 'recommended' | 'optional';
+    guidance: string;
+  }>;
+  /** Registry-backed warnings/errors that should be raised before execution. */
+  validationHints?: Array<{
+    severity: 'error' | 'warning' | 'info';
+    when: FieldValidationHintTrigger;
+    message: string;
+    suggestedValue?: unknown;
+  }>;
+}
+
+export interface RuntimeFieldContract {
+  /** Universal semantic role used by runtime AI field tasks and validation. */
+  role?: RuntimeValueRole;
+  /** Universal shape/cardinality expected at execution time. */
+  cardinality?: RuntimeValueCardinality;
+  /** Declarative source policy; the runtime engine interprets these generically. */
+  sourcePolicy?: {
+    businessDataAllowed?: boolean;
+    metadataForbidden?: boolean;
+    errorDataForbidden?: boolean;
+    credentialForbidden?: boolean;
+    systemOnly?: boolean;
+    manualOnly?: boolean;
+  };
+  /** Whether runtime AI is allowed to create this value when the field is runtime-owned. */
+  aiGeneratable?: boolean;
+  /** Protected values are never invented by runtime AI. */
+  protected?: boolean;
+  /** The field is required when a sibling field has a matching value. */
+  requiredWhen?: Array<{ field: string; equals?: unknown; notEquals?: unknown }>;
+  /**
+   * At least one field in the same group must be meaningfully present when the
+   * selected operation makes the group required.
+   */
+  requiredGroup?: string;
+  /** Generic validation formats interpreted by the universal runtime engine. */
+  validation?: {
+    format?: RuntimeValidationFormat;
+    formats?: RuntimeValidationFormat[];
+    allowEmpty?: boolean;
+  };
+  /** Generic repair strategies interpreted by the universal runtime engine. */
+  repair?: RuntimeRepairStrategy[];
+  /** Examples that should be treated as invalid/placeholder values. */
+  invalidExamples?: unknown[];
+}
+
+export interface NodeInputField {
+  type: 'string' | 'number' | 'boolean' | 'array' | 'object' | 'json' | 'expression';
+  description: string;
+  required: boolean;
+  default?: any;
+  examples?: any[];
+  validation?: (value: any) => boolean | string; // Return true if valid, or error message
+  dependsOn?: string[]; // Field dependencies
+  /**
+   * Universal, registry-driven fill mode metadata.
+   * This describes how values for this input are expected to be provided:
+   * - manual_static: user (or static config) must provide the value
+   * - runtime_ai: value is filled at runtime from upstream JSON + intent
+   * - buildtime_ai_once: AI may generate a static value once during configuration.
+   *
+   * NOTE: This is metadata only; runtime behavior is enforced by dynamic-node-executor.
+   */
+  fillMode?: {
+    /** Default strategy when workflow builders / UI have no explicit choice. */
+    default: FieldFillMode;
+    /** Whether runtime AI input resolution is allowed for this field. */
+    supportsRuntimeAI?: boolean;
+    /** Whether build-time AI is allowed to generate a static value once. */
+    supportsBuildtimeAI?: boolean;
+  };
+  /**
+   * Semantic role for universal runtime AI behavior and UX grouping.
+   * This is metadata only (no node-specific execution branching).
+   */
+  role?:
+    | 'title_like'
+    | 'long_body'
+    | 'short_summary'
+    | 'raw_json'
+    | 'id'
+    | 'config'
+    | 'prompt'
+    | 'recipient'
+    | 'content'
+    | 'operation_selector'
+    | 'type_selector'
+    | 'field_name'
+    | 'value'
+    | 'query';
+  /** Canonical ownership class used across planner/question/runtime phases. */
+  ownership?: FieldOwnershipClass;
+  /**
+   * When `ownership` is `credential`, controls whether the Field Ownership UI may
+   * be unlocked so the user can choose manual vs AI fill modes (via `unlock_<nodeId>_<field>` on attach-inputs).
+   * - `locked` (default): treat as vault-like; only manual_static unless explicitly unlocked when unlockable.
+   * - `unlockable`: locked until `config._ownershipUnlock[fieldName]` is true.
+   */
+  credentialTogglePolicy?: 'locked' | 'unlockable';
+  /**
+   * Whether this field is essential for useful node behavior in the unified
+   * full-configuration wizard. Required fields are implicitly essential.
+   */
+  essentialForExecution?: boolean;
+  /**
+   * When set, this field mirrors another input field (canonical name on the same node).
+   * Dynamic executor copies from the canonical field before strict runtime_ai validation
+   * if this field is empty. Use with essentialForExecution: false on the alias to avoid
+   * duplicate strict requirements (e.g. Slack `text` vs `message`).
+   */
+  aliasOf?: string;
+  /**
+   * Registry-driven category for "how to get this value" UX and credential flows.
+   */
+  helpCategory?: FieldHelpCategory;
+  /** Optional canonical documentation URL for this field (console / vendor docs). */
+  docsUrl?: string;
+  /** Optional example string shown in guides (non-secret placeholder). */
+  exampleValue?: string;
+  /** Universal field-level behavior and risk metadata used by guidance, validation, and AI resolution. */
+  fieldIntelligence?: FieldIntelligence;
+  /** Universal runtime generation, validation, and repair contract for this field. */
+  runtimeContract?: RuntimeFieldContract;
+  /**
+   * Optional registry-level hint for the per-field directive generator at build time.
+   * Describes what this field must hold and what it must never contain.
+   * When present, enriches the directive generated for this field during workflow creation.
+   */
+  runtimeDirectiveTemplate?: string;
+  /**
+   * UI hints for schema-driven Properties panel and GET /api/node-definitions.
+   * Populated from NodeLibrary field definitions (options, requiredIf); not used for execution.
+   */
+  ui?: {
+    options?: Array<{ label: string; value: string }>;
+    requiredIf?: { field: string; equals: unknown };
+    /** Visibility only (field optional when shown). Prefer over requiredIf when fields must not be marked required. */
+    visibleIf?: { field: string; equals: unknown };
+    widget?: 'text' | 'textarea' | 'json' | 'multi_email' | 'date';
+    /** Shown under selects when config value matches whenValue (schema-driven UX). */
+    contextHints?: Array<{ whenValue: string; message: string }>;
+  };
+}
+
+export interface NodeInputSchema {
+  [fieldName: string]: NodeInputField;
+}
+
+export interface NodeOutputPort {
+  name: string; // e.g., 'default', 'true', 'false', 'error'
+  description: string;
+  schema: {
+    type: 'string' | 'number' | 'boolean' | 'array' | 'object';
+    properties?: Record<string, any>; // JSON schema properties
+  };
+}
+
+export interface NodeOutputSchema {
+  [portName: string]: NodeOutputPort;
+}
+
+/**
+ * Effective output schema: the JSON shape a node produces at runtime.
+ * Used by intent→config to generate downstream node config/code from upstream output.
+ * - For static nodes: properties describe the fixed shape (e.g. http_request → status, body).
+ * - For dynamic nodes (form, code): properties are derived from config (form fields) or marked dynamic.
+ */
+export interface EffectiveOutputSchema {
+  type: 'object' | 'array' | 'string' | 'number' | 'boolean';
+  /** For type 'object': property names and types. Downstream nodes use these to generate code (e.g. $json.number). */
+  properties?: Record<string, { type: string; description?: string }>;
+  /** For type 'array': item shape when known. */
+  itemType?: 'object' | 'string' | 'number' | 'boolean';
+  /** True if output shape is defined by node config (e.g. form fields, code return). Caller should use upstream schema + intent. */
+  dynamic?: boolean;
+}
+
+export interface NodeCredentialRequirement {
+  provider: string; // e.g., 'google', 'slack', 'openai'
+  category: string; // e.g., 'oauth', 'api_key', 'webhook'
+  required: boolean;
+  description: string;
+  scopes?: string[]; // OAuth scopes if applicable
+  requiredScopes?: string[];
+  credentialTypeId?: string; // Primary exact credential type, e.g. openai_api_key
+  credentialTypeIds?: string[]; // Accepted credential types for multi-auth providers
+  authType?: 'oauth2' | 'api_key' | 'bearer_token' | 'basic_auth' | 'query_auth' | 'custom_header';
+  label?: string;
+  testable?: boolean;
+}
+
+export interface NodeCredentialSchema {
+  requirements: NodeCredentialRequirement[];
+  // Fields in config that are credentials (for discovery)
+  credentialFields?: string[];
+}
+
+export interface NodeMigration {
+  fromVersion: string;
+  toVersion: string;
+  migrate: (oldConfig: Record<string, any>) => Record<string, any>;
+}
+
+export interface NodeOperationContract {
+  resource?: string;
+  operation: string;
+  label: string;
+  requiredFields: string[];
+  optionalFields: string[];
+  forbiddenFields?: string[];
+  conditionallyRequiredFields?: Array<{ field: string; when: Record<string, unknown> }>;
+  payloadGroups?: Array<{ name: string; anyOf: string[]; required?: boolean }>;
+  emptyValuePolicy?: Record<string, 'invalid' | 'optional' | 'provider_default' | 'allow_empty'>;
+  fieldSourcePolicy?: Record<string, RuntimeFieldContract['sourcePolicy']>;
+  runtimeAiPolicy?: Record<string, { allowed: boolean; required?: boolean }>;
+  providerDefaultFields?: string[];
+  credentialProviders: string[];
+  outputFields: string[];
+  legacyAliases?: string[];
+  status: 'implemented' | 'unsupported' | 'deprecated';
+}
+
+export interface NodeExecutionContext {
+  nodeId: string;
+  nodeType: string;
+  config: Record<string, any>;
+  inputs: Record<string, any>; // Resolved input values
+  finalResolvedInputs?: FinalResolvedInputs;
+  resolvedInputSources?: Record<string, RuntimeInputSource>;
+  runtimeInputHandoffAudit?: RuntimeInputHandoffAudit[];
+  fieldContracts?: NodeInputSchema;
+  operation?: string;
+  rawUpstreamInput?: unknown;
+  lineageContext?: Record<string, unknown>;
+  providerContext?: ProviderExecutionContext;
+  rawInput: unknown; // Raw incoming data payload from upstream (what the node "receives")
+  upstreamOutputs: Map<string, any>; // nodeId -> output
+  workflowId: string;
+  userId?: string;
+  currentUserId?: string;
+  db: any; // AWS RDS DB client
+  [key: string]: any; // Additional context
+}
+
+export interface NodeExecutionResult {
+  success: boolean;
+  output?: any;
+  error?: {
+    code: string;
+    message: string;
+    details?: any;
+  };
+  metadata?: {
+    executionTime?: number;
+    retries?: number;
+    operationStatus?: 'succeeded' | 'failed' | 'unknown';
+    acknowledgementStatus?: 'parsed' | 'empty_success' | 'parse_failed' | 'not_required';
+    persistenceStatus?: 'saved' | 'delayed' | 'failed';
+    [key: string]: any;
+  };
+}
+
+/**
+ * UNIFIED NODE DEFINITION CONTRACT
+ * 
+ * This is the single source of truth for ALL node behavior.
+ * Every node type must have a complete definition here.
+ */
+export interface UnifiedNodeDefinition {
+  // ============================================
+  // CORE IDENTITY (Immutable)
+  // ============================================
+  type: string; // Canonical node type (e.g., 'google_sheets', 'ai_chat_model')
+  label: string; // Human-readable label
+  category: string;
+  description: string;
+  icon?: string;
+  version: string; // Schema version (e.g., '1.0.0')
+  
+  // ============================================
+  // SCHEMA DEFINITIONS (Single Source of Truth)
+  // ============================================
+  inputSchema: NodeInputSchema; // ALL possible input fields
+  outputSchema: NodeOutputSchema; // ALL possible output ports
+  operationContracts?: NodeOperationContract[]; // Operation-level UI/execution contract
+  credentialSchema?: NodeCredentialSchema; // Credential requirements
+  
+  // ============================================
+  // VALIDATION & DEFAULTS
+  // ============================================
+  requiredInputs: string[]; // Subset of inputSchema keys that are required
+  defaultConfig: () => Record<string, any>; // Factory function for default config
+  
+  validateConfig: (config: Record<string, any>) => {
+    valid: boolean;
+    errors: string[];
+    warnings?: string[];
+  };
+  
+  // ============================================
+  // EXECUTION CONTRACT
+  // ============================================
+  /**
+   * Execute the node
+   * This is the ONLY place node-specific execution logic should exist
+   */
+  execute: (context: NodeExecutionContext) => Promise<NodeExecutionResult>;
+  
+  // ============================================
+  // EDGE CONNECTIONS
+  // ============================================
+  incomingPorts: string[]; // Port names for incoming edges (usually ['default'])
+  outgoingPorts: string[]; // Port names for outgoing edges (e.g., ['default', 'true', 'false'])
+  isBranching: boolean; // true if node can have multiple outgoing edges
+  
+  /**
+   * When true, this node may legally receive more than one incoming edge.
+   * Used by DAG validator, edge reconciliation, and branching validator to permit multi-input.
+   * Defaults to undefined (falsy) for all existing nodes — no regressions.
+   * Example: log_output (merge-capable terminal), merge (explicit merge node)
+   */
+  allowsMultipleInputs?: boolean;
+  
+  /**
+   * When true, this node must have zero outgoing edges (terminal node).
+   * Used by DAG validator to enforce out-degree = 0.
+   * Example: log_output (terminal output node)
+   */
+  isTerminal?: boolean;
+  
+  /**
+   * Maximum number of outgoing edges this node may have.
+   * When set to 0, enforcement layers reject any outgoing edges from this node.
+   * Used by DAG validator to enforce out-degree constraints.
+   * Example: log_output (maxOutDegree: 0)
+   */
+  maxOutDegree?: number;
+  
+  // ============================================
+  // BACKWARD COMPATIBILITY
+  // ============================================
+  migrations?: NodeMigration[]; // Migrate old configs to new schema
+  aliases?: string[]; // Alternative type names (e.g., 'gmail' -> 'google_gmail')
+  
+  // ============================================
+  // AI GENERATION SUPPORT
+  // ============================================
+  aiSelectionCriteria?: {
+    keywords: string[];
+    useCases: string[];
+    whenToUse: string[];
+    whenNotToUse: string[];
+  };
+  
+  // ============================================
+  // METADATA
+  // ============================================
+  tags?: string[]; // For search/filtering
+  /**
+   * Capability strings from NodeLibrary (e.g. email.send, gmail.send). Used for registry-driven
+   * routing (transactional email must use the correct channel, not a generic LLM node).
+   */
+  capabilities?: string[];
+  deprecated?: boolean; // Mark as deprecated
+  replacement?: string; // Suggested replacement node type
+  
+  // ============================================
+  // WORKFLOW-LEVEL BEHAVIORS (Registry-Driven)
+  // ============================================
+  /**
+   * Workflow-level behaviors that apply to ALL workflows
+   * These are defined in the registry, not hardcoded in builders
+   * 
+   * Example: log_output has alwaysRequired: true, alwaysTerminal: true
+   * This means it's automatically included in all workflows and must be the last node
+   */
+  workflowBehavior?: {
+    /**
+     * Always required in workflows (auto-included even if not in intent)
+     * Example: log_output (universal final output)
+     */
+    alwaysRequired?: boolean;
+    
+    /**
+     * Must be terminal node (no outgoing edges, always last)
+     * Example: log_output (must be final node)
+     */
+    alwaysTerminal?: boolean;
+    
+    /**
+     * Exempt from removal by minimal workflow policy
+     * Example: log_output (should never be removed)
+     */
+    exemptFromRemoval?: boolean;
+    
+    /**
+     * Auto-inject if missing (after workflow building)
+     * Example: log_output (inject if not present)
+     */
+    autoInject?: boolean;
+    
+    /**
+     * Injection priority (lower = higher priority)
+     * Example: log_output = 0 (highest priority, inject first)
+     */
+    injectionPriority?: number;
+  };
+}
+
+/**
+ * Maps switch case values to downstream node types.
+ * e.g. { "sales": "slack", "support": "google_gmail", "general": "log_output" }
+ * Used by WorkflowIntentPlan and Graph_Orchestrator switch edge wiring.
+ */
+export interface CaseNodeMapping {
+  [caseValue: string]:
+    | string
+    | {
+        targetNodeType?: string;
+        targetNodeId?: string;
+        slot?: string;
+      };
+}
+
+/**
+ * NODE REGISTRY INTERFACE
+ * 
+ * Central registry that stores ALL node definitions.
+ * This is the ONLY place node behavior is defined.
+ */
+export interface INodeRegistry {
+  /**
+   * Register a node definition
+   * This is called during system initialization
+   */
+  register(definition: UnifiedNodeDefinition): void;
+  
+  /**
+   * Get node definition by type
+   * Returns undefined if node type doesn't exist
+   */
+  get(nodeType: string): UnifiedNodeDefinition | undefined;
+  
+  /**
+   * Get all registered node types
+   */
+  getAllTypes(): string[];
+  
+  /**
+   * Check if node type exists
+   */
+  has(nodeType: string): boolean;
+  
+  /**
+   * Resolve alias to canonical type
+   * e.g., 'gmail' -> 'google_gmail'
+   */
+  resolveAlias(alias: string): string | undefined;
+  
+  /**
+   * Migrate old config to current schema version
+   */
+  migrateConfig(nodeType: string, oldConfig: Record<string, any>): Record<string, any>;
+  
+  /**
+   * Validate node config against schema
+   */
+  validateConfig(nodeType: string, config: Record<string, any>): {
+    valid: boolean;
+    errors: string[];
+    warnings?: string[];
+  };
+  
+  /**
+   * Get default config for node type
+   */
+  getDefaultConfig(nodeType: string): Record<string, any>;
+  
+  /**
+   * Get required credentials for node type
+   */
+  getRequiredCredentials(nodeType: string): NodeCredentialRequirement[];
+  
+  /**
+   * Get output schema for node type
+   */
+  getOutputSchema(nodeType: string): NodeOutputSchema | undefined;
+  
+  /**
+   * Get input schema for node type
+   */
+  getInputSchema(nodeType: string): NodeInputSchema | undefined;
+  
+  /**
+   * Get effective output schema for a node given its config.
+   * For form: derives properties from config.fields. For code/javascript: returns dynamic object.
+   * Used by intent→config to generate downstream config/code from upstream JSON shape.
+   */
+  getEffectiveOutputSchema(nodeType: string, config?: Record<string, any>): EffectiveOutputSchema | undefined;
+
+  /**
+   * Branching nodes: effective outgoing port names for this workflow node instance
+   * (e.g. switch cases from persisted config). Prefer over definition.outgoingPorts alone.
+   */
+  getOutgoingPortsForWorkflowNode(node: {
+    type?: string;
+    data?: { type?: string; config?: Record<string, any> };
+  }): string[];
+  
+  /**
+   * ✅ UNIVERSAL: Get all nodes with specific workflow-level behavior
+   * Used by orchestrators, policies, builders to query registry
+   */
+  getNodesWithBehavior(behavior: keyof NonNullable<UnifiedNodeDefinition['workflowBehavior']>): UnifiedNodeDefinition[];
+  
+  /**
+   * ✅ UNIVERSAL: Check if node has specific workflow behavior
+   */
+  hasWorkflowBehavior(nodeType: string, behavior: keyof NonNullable<UnifiedNodeDefinition['workflowBehavior']>): boolean;
+  
+  /**
+   * ✅ UNIVERSAL: Get all always-required nodes (for auto-inclusion)
+   */
+  getAlwaysRequiredNodes(): UnifiedNodeDefinition[];
+  
+  /**
+   * ✅ UNIVERSAL: Get all always-terminal nodes (must be last)
+   */
+  getAlwaysTerminalNodes(): UnifiedNodeDefinition[];
+  
+  /**
+   * ✅ UNIVERSAL: Get all exempt-from-removal nodes
+   */
+  getExemptFromRemovalNodes(): UnifiedNodeDefinition[];
+
+  /**
+   * Returns true if the given node type is classified as a utility node
+   * (category === 'utility' or tags include logging/debug/side-effect/internal).
+   * Returns false for unknown types (fail-safe).
+   */
+  isUtilityNode(nodeType: string): boolean;
+
+  /**
+   * Returns upstream output fields and target buildtime-AI-eligible input fields
+   * for the given node pair. Used by PropertyPopulationStage to enrich LLM prompts.
+   * Returns { upstreamFields: [], targetFields: [] } for unknown target types.
+   */
+  getBuildValueContext(targetNodeType: string, upstreamNodeType: string | undefined): {
+    upstreamFields: Array<{ name: string; type: string; description?: string }>;
+    targetFields: Array<{
+      name: string;
+      role: string;
+      type: string;
+      fillMode: any;
+      essentialForExecution: boolean;
+      supportsBuildtimeAI: boolean;
+    }>;
+  };
+}

@@ -1,0 +1,107 @@
+{
+  "name": "Notion Comprehensive Test",
+  "description": "Test multiple Notion operations: search, get user info, list databases. Uses OAuth from header automatically.",
+  "nodes": [
+    {
+      "id": "node_1",
+      "type": "custom",
+      "position": { "x": 100, "y": 100 },
+      "data": {
+        "type": "manual_trigger",
+        "label": "Start Test",
+        "category": "triggers",
+        "icon": "Play",
+        "config": {}
+      }
+    },
+    {
+      "id": "node_2",
+      "type": "custom",
+      "position": { "x": 300, "y": 100 },
+      "data": {
+        "type": "notion",
+        "label": "Search All Pages",
+        "category": "database",
+        "icon": "Database",
+        "config": {
+          "resource": "search",
+          "operation": "search",
+          "searchQuery": "",
+          "filter": {"property": "object", "value": "page"},
+          "returnAll": false,
+          "pageSize": 5
+        }
+      }
+    },
+    {
+      "id": "node_3",
+      "type": "custom",
+      "position": { "x": 500, "y": 100 },
+      "data": {
+        "type": "notion",
+        "label": "Get User Info",
+        "category": "database",
+        "icon": "Database",
+        "config": {
+          "resource": "user",
+          "operation": "getMe"
+        }
+      }
+    },
+    {
+      "id": "node_4",
+      "type": "custom",
+      "position": { "x": 700, "y": 100 },
+      "data": {
+        "type": "notion",
+        "label": "List Databases",
+        "category": "database",
+        "icon": "Database",
+        "config": {
+          "resource": "database",
+          "operation": "list",
+          "returnAll": false,
+          "pageSize": 10
+        }
+      }
+    },
+    {
+      "id": "node_5",
+      "type": "custom",
+      "position": { "x": 900, "y": 100 },
+      "data": {
+        "type": "log_output",
+        "label": "View Results",
+        "category": "output",
+        "icon": "FileOutput",
+        "config": {
+          "message": "Test completed successfully!",
+          "level": "info"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_1",
+      "source": "node_1",
+      "target": "node_2"
+    },
+    {
+      "id": "edge_2",
+      "source": "node_2",
+      "target": "node_3"
+    },
+    {
+      "id": "edge_3",
+      "source": "node_3",
+      "target": "node_4"
+    },
+    {
+      "id": "edge_4",
+      "source": "node_4",
+      "target": "node_5"
+    }
+  ],
+  "viewport": { "x": 0, "y": 0, "zoom": 0.8 }
+}

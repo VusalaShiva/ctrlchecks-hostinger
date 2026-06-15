@@ -1,0 +1,68 @@
+{
+  "name": "Google Calendar - List Events Test",
+  "description": "Test listing events from primary calendar. Shows upcoming events.",
+  "nodes": [
+    {
+      "id": "node_1",
+      "type": "custom",
+      "position": { "x": 100, "y": 100 },
+      "data": {
+        "type": "manual_trigger",
+        "label": "Start Test",
+        "category": "triggers",
+        "icon": "Play",
+        "config": {}
+      }
+    },
+    {
+      "id": "node_2",
+      "type": "custom",
+      "position": { "x": 300, "y": 100 },
+      "data": {
+        "type": "google_calendar",
+        "label": "List Events",
+        "category": "productivity",
+        "icon": "Calendar",
+        "config": {
+          "resource": "event",
+          "operation": "list",
+          "calendarId": "primary",
+          "timeMin": "2025-02-14T00:00:00Z",
+          "timeMax": "",
+          "maxResults": 10,
+          "singleEvents": true,
+          "orderBy": "startTime",
+          "returnAll": false
+        }
+      }
+    },
+    {
+      "id": "node_3",
+      "type": "custom",
+      "position": { "x": 500, "y": 100 },
+      "data": {
+        "type": "log_output",
+        "label": "View Results",
+        "category": "output",
+        "icon": "FileOutput",
+        "config": {
+          "message": "Found {{$json.items.length}} events",
+          "level": "info"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_1",
+      "source": "node_1",
+      "target": "node_2"
+    },
+    {
+      "id": "edge_2",
+      "source": "node_2",
+      "target": "node_3"
+    }
+  ],
+  "viewport": { "x": 0, "y": 0, "zoom": 1 }
+}

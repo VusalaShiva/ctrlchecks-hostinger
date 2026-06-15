@@ -1,0 +1,1851 @@
+/**
+ * Comprehensive Node Questions Generator
+ * 
+ * ✅ ARCHITECTURAL PRINCIPLE: Only asks for CREDENTIALS (API keys, OAuth tokens, URLs)
+ * All other fields (operations, configuration, resources) are AI-generated automatically
+ * 
+ * Credentials asked from users:
+ * - API keys (apiKey, api_key, apiToken, etc.)
+ * - OAuth tokens (accessToken, refreshToken, clientId, clientSecret, etc.)
+ * - URLs (baseUrl, apiUrl, endpoint, host, hostname, server)
+ * 
+ * NOT asked (AI-generated):
+ * - Operations (create, read, update, delete, etc.)
+ * - Configuration fields (prompts, conditions, messages, etc.)
+ * - Resource fields (contacts, companies, deals, etc.)
+ * 
+ * This ensures that:
+ * 1. Users only provide authentication credentials and URLs
+ * 2. AI workflow builder generates all other required fields automatically
+ * 3. No manual configuration questions are asked
+ */
+
+import { WorkflowNode, Workflow } from '../../core/types/ai-types';
+import { nodeLibrary } from '../nodes/node-library';
+import { unifiedNormalizeNodeType } from '../../core/utils/unified-node-type-normalizer';
+import { unifiedNodeRegistry } from '../../core/registry/unified-node-registry';
+import { getQuestionConfig, getOrderedQuestions } from './node-question-order';
+import { isEmptyValue } from '../../core/utils/is-empty-value';
+import { resolveEffectiveFieldFillMode } from '../../core/utils/fill-mode-resolver';
+import { isCredentialOwnership, isStructuralOwnership } from '../../core/utils/field-ownership';
+import {
+  isFieldUserProvidedText,
+  shouldUseSelectForExplicitOptions,
+} from '../../core/utils/schema-field-control';
+import { getInputControlMetadata } from '../../core/utils/schema-input-control';
+import { getCredentialVaultMetaForField, getPrimaryCredentialFieldForNode } from '../../core/utils/credential-field-vault-meta';
+import { computeFieldRequiredBeforeExecution } from '../../core/validation/registry-field-contract';
+import { resolveFieldPolicyForNode } from '../../core/operations/field-policy-resolver';
+import {
+  analyzeSelectedWorkflowIntelligence,
+  type SelectedWorkflowIntelligence,
+} from '../../core/utils/selected-workflow-intelligence';
+import type { FieldRelevanceResult } from '../../core/types/unified-node-contract';
+
+export interface ComprehensiveNodeQuestion {
+  id: string;
+  text: string;
+  type: string;
+  nodeId: string;
+  nodeType: string;
+  nodeLabel: string;
+  fieldName: string;
+  category: 'credential' | 'operation' | 'configuration' | 'resource';
+  required: boolean;
+  options?: Array<{ label: string; value: string }>;
+  askOrder: number;
+  example?: any;
+  placeholder?: string;
+  description?: string;
+  // ✅ Optional: Skip checkbox for conditional questions
+  skipIfManualEmailProvided?: boolean;
+  skipLabel?: string;
+  /**
+   * Registry-driven fill mode metadata for this field, surfaced to the UI so the
+   * user can choose between manual vs AI-filled strategies without any
+   * node-specific hardcoding in the frontend.
+   */
+  fillModeDefault?: 'manual_static' | 'runtime_ai' | 'buildtime_ai_once';
+  supportsRuntimeAI?: boolean;
+  supportsBuildtimeAI?: boolean;
+  role?: string;
+  ownershipClass?: 'structural' | 'value' | 'credential';
+  /**
+   * Field Ownership wizard: whether the user can change User vs AI runtime for this row.
+   * - selectable: both toggles enabled (attach-inputs may coerce invalid runtime_ai per policy)
+   * - user_only: legacy; prefer selectable
+   * - locked: vault/OAuth credential rows only (handled on Credentials step)
+   */
+  ownershipUiMode?: 'selectable' | 'user_only' | 'locked';
+  /** When ownershipUiMode is locked or user_only, explains why (for UI helper text). */
+  ownershipLockReason?:
+    | 'structural'
+    | 'runtime_ai_default'
+    | 'ai_filled'
+    | 'vault_or_oauth'
+    | 'credential_locked_until_unlock'
+    | 'manual_only'
+    | 'no_runtime_ai';
+  /** True when the field was populated by build-time AI (snapshot shown; row usually remains selectable). */
+  aiFilledAtBuildTime?: boolean;
+  /**
+   * Effective fill mode is runtime_ai: value is intentionally empty in stored workflow;
+   * executor fills at run time. Not the same as "prefilled".
+   */
+  aiUsesRuntime?: boolean;
+  /**
+   * Effective mode is buildtime_ai_once but value is still empty (e.g. [] before materialize/attach).
+   * User should regenerate, run attach-inputs, or switch to You and edit.
+   */
+  aiBuildTimePending?: boolean;
+  /** Credential row can be unlocked via attach-inputs `unlock_<nodeId>_<fieldName>`. */
+  isUnlockableCredential?: boolean;
+  /** Current value from node.data.config (stringified for objects/arrays); for wizard pre-fill. */
+  defaultValue?: string;
+  /** Universal selected-workflow relevance for this exact node field. */
+  fieldRelevance?: FieldRelevanceResult;
+  /**
+   * Vault key for filterCredentialQuestions / attach-credentials (connector registry).
+   * Must align with credential discovery `credentialId` / `vaultKey` (e.g. slack + webhookUrl field).
+   */
+  credential?: { vaultKey: string; credentialId?: string };
+}
+
+function annotateQuestionsWithSelectedWorkflowIntelligence(
+  questions: ComprehensiveNodeQuestion[],
+  intelligence: SelectedWorkflowIntelligence
+): ComprehensiveNodeQuestion[] {
+  return questions.map((q) => {
+    const relevance = intelligence.nodes.find((node) => node.nodeId === q.nodeId)?.fields[q.fieldName];
+    if (!relevance) return q;
+    return {
+      ...q,
+      fieldRelevance: relevance,
+      required: q.required || relevance.relevance === 'required',
+    };
+  });
+}
+
+function filterQuestionsBySelectedWorkflowIntelligence(
+  questions: ComprehensiveNodeQuestion[],
+): ComprehensiveNodeQuestion[] {
+  return questions.filter((q) => {
+    if (q.category === 'credential') return true;
+    if (q.aiUsesRuntime || q.aiFilledAtBuildTime || q.aiBuildTimePending) return true;
+    if (!q.fieldRelevance) return true;
+    return q.fieldRelevance.shouldShowInOwnership !== false;
+  });
+}
+
+function shouldHidePassiveStructuralField(
+  nodeCategory: string | undefined,
+  fieldName: string,
+  fieldDef: any,
+  config: Record<string, any>,
+): boolean {
+  if (!fieldDef || !isStructuralOwnership(fieldName, fieldDef)) return false;
+  if (config._fillMode?.[fieldName] !== undefined) return false;
+  if (nodeCategory === 'logic' || nodeCategory === 'flow') return false;
+  return /(condition|conditions|case|cases|expression|rule|rules)$/i.test(fieldName);
+}
+
+export interface NodeQuestionsResult {
+  questions: ComprehensiveNodeQuestion[];
+  nodeQuestionsMap: Map<string, ComprehensiveNodeQuestion[]>; // nodeId -> questions
+}
+
+/**
+ * Ensures every registry inputSchema field has a row for Field Ownership (merge pass).
+ */
+function addMissingInputSchemaQuestionsForOwnership(
+  workflow: Workflow,
+  existing: ComprehensiveNodeQuestion[]
+): ComprehensiveNodeQuestion[] {
+  const byKey = new Set(existing.map((q) => `${q.nodeId}_${q.fieldName}`));
+  const added: ComprehensiveNodeQuestion[] = [...existing];
+  for (const node of workflow.nodes) {
+    const nodeType = unifiedNormalizeNodeType(node);
+    const def = unifiedNodeRegistry.get(nodeType);
+    const inputSchema = def?.inputSchema;
+    if (!inputSchema) continue;
+    const nodeLabel = node.data?.label || nodeType;
+    const config = (node.data?.config || {}) as Record<string, any>;
+    const fieldPolicy = resolveFieldPolicyForNode(def, config);
+    for (const fieldName of Object.keys(inputSchema)) {
+      const key = `${node.id}_${fieldName}`;
+      if (byKey.has(key)) continue;
+      const fieldDef = inputSchema[fieldName] as any;
+      const vaultMeta = getCredentialVaultMetaForField(nodeType, fieldName);
+      const credentialOwned = !!vaultMeta || isCredentialOwnership(fieldName, fieldDef);
+      const policy = fieldPolicy.fields[fieldName];
+      const fillMode = fieldDef?.fillMode?.default;
+      const isAiOwned = fillMode === 'runtime_ai' || fillMode === 'buildtime_ai_once';
+      if (!credentialOwned && policy?.active === false && !isAiOwned) continue;
+      const mode = resolveEffectiveFieldFillMode(fieldName, inputSchema, config);
+      const hasExplicitFillMode = config._fillMode?.[fieldName] !== undefined;
+      const valueIsEmpty = isEmptyValue(config[fieldName]);
+
+      if (!credentialOwned && shouldHidePassiveStructuralField(def.category, fieldName, fieldDef, config)) continue;
+      if (!credentialOwned && mode === 'runtime_ai' && !hasExplicitFillMode && !valueIsEmpty) continue;
+
+      byKey.add(key);
+      const control = getInputControlMetadata(fieldName, fieldDef);
+      const mergedType = control.inputType === 'json' ? 'textarea' : control.inputType;
+      added.push({
+        id: `ownership_${node.id}_${fieldName}`,
+        text: `${fieldName}`,
+        type: mergedType,
+        nodeId: node.id,
+        nodeType,
+        nodeLabel,
+        fieldName,
+        category: credentialOwned ? 'credential' : 'configuration',
+        required: false,
+        askOrder: 99,
+        options: control.options,
+        placeholder: control.placeholder || fieldDef?.description,
+        description: fieldDef?.description || `Input field ${fieldName}`,
+        fillModeDefault: fieldDef?.fillMode?.default,
+        supportsRuntimeAI: fieldDef?.fillMode?.supportsRuntimeAI !== false,
+        supportsBuildtimeAI: fieldDef?.fillMode?.supportsBuildtimeAI !== false,
+        role: fieldDef?.role,
+        ownershipClass: credentialOwned ? 'credential' : fieldDef?.ownership,
+        credential: vaultMeta,
+      });
+    }
+  }
+  return added;
+}
+
+/**
+ * Field Ownership: keep all questions and annotate UI mode instead of dropping rows.
+ * Vault/OAuth credential questions stay in the array but are locked (handled in Credentials step).
+ */
+/** Stringify config field for question defaultValue / wizard pre-fill (objects and arrays as JSON). */
+export function snapshotConfigFieldToString(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch {
+      return String(value);
+    }
+  }
+  return String(value);
+}
+
+function attachDefaultValuesFromConfig(
+  questions: ComprehensiveNodeQuestion[],
+  workflow: Workflow
+): ComprehensiveNodeQuestion[] {
+  return questions.map((q) => {
+    const node = workflow.nodes.find((n) => n.id === q.nodeId);
+    if (!node) return q;
+    const config = (node.data?.config || {}) as Record<string, any>;
+    if (!(q.fieldName in config)) return q;
+    const raw = config[q.fieldName];
+    if (isEmptyValue(raw)) return q;
+    const str = snapshotConfigFieldToString(raw);
+    if (str === undefined || str === '') return q;
+    return { ...q, defaultValue: str };
+  });
+}
+
+function annotateQuestionsForOwnershipUi(
+  questions: ComprehensiveNodeQuestion[],
+  workflow: Workflow
+): ComprehensiveNodeQuestion[] {
+  return questions.map((q) => {
+    const node = workflow.nodes.find((n) => n.id === q.nodeId);
+    const next: ComprehensiveNodeQuestion = { ...q };
+
+    if (!node) {
+      if (q.category === 'credential') {
+        next.ownershipUiMode = 'locked';
+        next.ownershipLockReason = 'vault_or_oauth';
+      } else {
+        next.ownershipUiMode = 'selectable';
+      }
+      return next;
+    }
+
+    const nodeType = unifiedNormalizeNodeType(node);
+    const def = unifiedNodeRegistry.get(nodeType);
+    const inputSchema = def?.inputSchema;
+    const config = (node.data?.config || {}) as Record<string, any>;
+
+    const fieldDef = inputSchema?.[q.fieldName];
+    const vaultMeta = getCredentialVaultMetaForField(nodeType, q.fieldName);
+    const isCredentialRow =
+      q.category === 'credential' ||
+      !!vaultMeta ||
+      (!!fieldDef && isCredentialOwnership(q.fieldName, fieldDef));
+
+    if (isCredentialRow) {
+      next.category = 'credential';
+      next.ownershipClass = 'credential';
+      next.credential = next.credential || vaultMeta;
+      if (!inputSchema || !fieldDef) {
+        next.ownershipUiMode = 'locked';
+        next.ownershipLockReason = 'vault_or_oauth';
+        return next;
+      }
+      const policy = fieldDef.credentialTogglePolicy ?? (vaultMeta ? 'unlockable' : 'locked');
+      const unlocked = policy === 'unlockable' && config._ownershipUnlock?.[q.fieldName] === true;
+      if (!unlocked) {
+        next.ownershipUiMode = 'locked';
+        next.ownershipLockReason =
+          policy === 'unlockable' ? 'credential_locked_until_unlock' : 'vault_or_oauth';
+        if (policy === 'unlockable') {
+          next.isUnlockableCredential = true;
+        }
+        return next;
+      }
+      // Unlocked unlockable credential: same ownership UX as value fields (below).
+      next.isUnlockableCredential = false;
+    }
+
+    if (!inputSchema || !(q.fieldName in inputSchema)) {
+      next.ownershipUiMode = 'selectable';
+      return next;
+    }
+    if (fieldDef?.ownership) {
+      next.ownershipClass = fieldDef.ownership;
+    }
+    if (fieldDef?.role) {
+      next.role = fieldDef.role;
+    }
+    const fillMeta = fieldDef?.fillMode;
+    if (fillMeta) {
+      next.fillModeDefault = fillMeta.default;
+      next.supportsRuntimeAI = fillMeta.supportsRuntimeAI !== false;
+      next.supportsBuildtimeAI = fillMeta.supportsBuildtimeAI !== false;
+    }
+
+    // Structural fields still need ownership choice (User vs AI); attach-inputs coerces invalid modes.
+    if (fieldDef && isStructuralOwnership(q.fieldName, fieldDef)) {
+      next.ownershipUiMode = 'selectable';
+      next.ownershipLockReason = undefined;
+    }
+
+    const mode = resolveEffectiveFieldFillMode(q.fieldName, inputSchema, config);
+    const val = config[q.fieldName];
+
+    // runtime_ai: stored workflow keeps this empty by design; show runtime badge, not "prefilled".
+    if (mode === 'runtime_ai') {
+      next.ownershipUiMode = 'selectable';
+      next.ownershipLockReason = undefined;
+      next.aiUsesRuntime = true;
+      (next as any).effectiveFillMode = mode;
+      return next;
+    }
+
+    // buildtime_ai_once: distinguish snapshot present vs still empty (universal UX).
+    if (mode === 'buildtime_ai_once') {
+      if (!isEmptyValue(val)) {
+        next.aiFilledAtBuildTime = true;
+      } else {
+        next.aiBuildTimePending = true;
+      }
+    }
+
+    // Expose effective fill mode for diagnostics / future UI, while keeping
+    // wizard ownership logic derived from config + defaults.
+    (next as any).effectiveFillMode = mode;
+
+    next.ownershipUiMode = 'selectable';
+    next.ownershipLockReason = undefined;
+    return next;
+  });
+}
+
+export interface GenerateQuestionsOptions {
+  /** Only generate questions for these categories. If empty, generates all categories. */
+  categories?: Array<'credential' | 'operation' | 'configuration' | 'resource'>;
+  /**
+   * credentials_only: current lightweight mode
+   * full_configuration: ask all essential fields for every node
+   */
+  mode?: 'credentials_only' | 'full_configuration';
+}
+
+/**
+ * Generate comprehensive questions for ALL nodes in the workflow
+ * This includes credentials, operations, and other required fields
+ * 
+ * By default, generates ALL question types. Use options.categories to filter.
+ * For credential-only mode, pass: { categories: ['credential'] }
+ */
+export function generateComprehensiveNodeQuestions(
+  workflow: Workflow,
+  answeredFields: Record<string, any> = {},
+  options: GenerateQuestionsOptions = {}
+): NodeQuestionsResult {
+  const allQuestions: ComprehensiveNodeQuestion[] = [];
+  const nodeQuestionsMap = new Map<string, ComprehensiveNodeQuestion[]>();
+  const isFullConfigurationMode = options.mode === 'full_configuration';
+  const selectedIntelligence = analyzeSelectedWorkflowIntelligence(workflow as any);
+
+  console.log(`[ComprehensiveQuestions] 🚀 START: Generating questions for ${workflow.nodes.length} nodes`);
+  console.log(`[ComprehensiveQuestions] Workflow nodes:`, workflow.nodes.map(n => ({ id: n.id, type: unifiedNormalizeNodeType(n), label: n.data?.label })));
+
+  // Process each node in the workflow
+  for (const node of workflow.nodes) {
+    const nodeType = unifiedNormalizeNodeType(node);
+    const nodeId = node.id;
+    const nodeLabel = node.data?.label || nodeType;
+    const config = node.data?.config || {};
+    const nodeQuestions: ComprehensiveNodeQuestion[] = [];
+
+    console.log(`[ComprehensiveQuestions] Processing node ${nodeId} (type: ${nodeType})`);
+    console.log(`[ComprehensiveQuestions] Node config:`, JSON.stringify(config, null, 2));
+
+    // Get node schema
+    const schema = nodeLibrary.getSchema(nodeType);
+    if (!schema || !schema.configSchema) {
+      console.warn(`[ComprehensiveQuestions] No schema found for node ${nodeType}, skipping`);
+      continue;
+    }
+    
+    // ✅ DEBUG: Log schema structure
+    const requiredFields = schema.configSchema.required || [];
+    const optionalFields = Object.keys(schema.configSchema.optional || {});
+    console.log(`[ComprehensiveQuestions] ${nodeType} schema - Required: [${requiredFields.join(', ')}], Optional: [${optionalFields.join(', ')}]`);
+
+    // In full_configuration mode we ask all categories.
+    // Otherwise keep legacy credential-focused behavior.
+    const requestedCategories = options.categories || (isFullConfigurationMode
+      ? ['credential', 'resource', 'operation', 'configuration']
+      : ['credential']);
+    
+    // STEP 1: Generate credential questions (askOrder: 0)
+    if (requestedCategories.includes('credential')) {
+      const credentialQuestions = generateCredentialQuestions(node, nodeType, nodeId, nodeLabel, config, answeredFields);
+      nodeQuestions.push(...credentialQuestions);
+    }
+
+    // STEP 2: Generate resource questions (askOrder: 1) - BEFORE operations
+    if (requestedCategories.includes('resource')) {
+      const resourceQuestions = generateResourceQuestions(node, nodeType, nodeId, nodeLabel, config, schema);
+      nodeQuestions.push(...resourceQuestions);
+    }
+
+    // STEP 3: Generate operation questions (askOrder: 2)
+    if (requestedCategories.includes('operation')) {
+      const operationQuestions = generateOperationQuestions(node, nodeType, nodeId, nodeLabel, config, schema);
+      nodeQuestions.push(...operationQuestions);
+    }
+
+    // STEP 4: Generate other required field questions using node-question-order system
+    if (requestedCategories.includes('configuration')) {
+      const configQuestions = generateConfigurationQuestions(
+        node,
+        nodeType,
+        nodeId,
+        nodeLabel,
+        config,
+        schema,
+        answeredFields,
+        isFullConfigurationMode
+      );
+      nodeQuestions.push(...configQuestions);
+    }
+
+    // Attach registry-driven fill mode metadata to each question so the UI can
+    // expose AI/manual toggles without any node-specific logic.
+    const unifiedDef = unifiedNodeRegistry.get(nodeType);
+    const inputSchema = unifiedDef?.inputSchema;
+    if (inputSchema) {
+      for (const q of nodeQuestions) {
+        const fieldDef = (inputSchema as any)[q.fieldName];
+        const fillMeta = fieldDef?.fillMode;
+        if (fillMeta) {
+          q.fillModeDefault = fillMeta.default;
+          q.supportsRuntimeAI = fillMeta.supportsRuntimeAI !== false;
+          q.supportsBuildtimeAI = fillMeta.supportsBuildtimeAI !== false;
+        }
+        if (fieldDef?.role) {
+          q.role = fieldDef.role;
+        }
+        if (fieldDef?.ownership) {
+          q.ownershipClass = fieldDef.ownership;
+        }
+      }
+    }
+
+    // Sort questions by askOrder
+    nodeQuestions.sort((a, b) => a.askOrder - b.askOrder);
+
+    // Add to maps
+    nodeQuestionsMap.set(nodeId, nodeQuestions);
+    allQuestions.push(...nodeQuestions);
+
+    console.log(`[ComprehensiveQuestions] ✅ Generated ${nodeQuestions.length} questions for node ${nodeId} (${nodeType})`);
+    if (nodeQuestions.length > 0) {
+      console.log(`[ComprehensiveQuestions] 📋 Questions breakdown for ${nodeType}:`);
+      nodeQuestions.forEach((q, idx) => {
+        console.log(`[ComprehensiveQuestions]   ${idx + 1}. ${q.fieldName} (${q.category}, askOrder: ${q.askOrder}, type: ${q.type}, required: ${q.required})`);
+      });
+    } else {
+      console.warn(`[ComprehensiveQuestions] ⚠️ NO QUESTIONS GENERATED for ${nodeType} node ${nodeId}!`);
+      console.warn(`[ComprehensiveQuestions]   Config keys: [${Object.keys(config).join(', ')}]`);
+      console.warn(`[ComprehensiveQuestions]   Config values:`, Object.entries(config).map(([k, v]) => `${k}=${typeof v === 'string' ? v.substring(0, 50) : v}`).join(', '));
+      console.warn(`[ComprehensiveQuestions]   Required fields: [${requiredFields.join(', ')}]`);
+      console.warn(`[ComprehensiveQuestions]   Optional fields: [${optionalFields.join(', ')}]`);
+    }
+  }
+
+  // ✅ CRITICAL: Sort questions by NODE ORDER first, then by askOrder within each node
+  // This ensures all questions for one node are asked before moving to the next node
+  // Node order: Trigger → Logic → HTTP/AI → Integrations → Outputs
+  
+  // Get node execution order from workflow (use node position in array as fallback)
+  const nodeOrderMap = new Map<string, number>();
+  workflow.nodes.forEach((node, index) => {
+    nodeOrderMap.set(node.id, index);
+  });
+  
+  // ✅ CRITICAL: Deduplicate questions by fieldName within each node
+  // This prevents the same field from being asked multiple times (e.g., as both credential and configuration)
+  const seenQuestionKeys = new Map<string, ComprehensiveNodeQuestion>(); // nodeId_fieldName -> question
+  
+  for (const question of allQuestions) {
+    const key = `${question.nodeId}_${question.fieldName}`;
+    
+    // Prefer question category aligned with canonical ownership (registry-driven).
+    const ownershipPriority: Record<string, number> = { credential: 0, structural: 1, value: 2 };
+    const categoryPriority: Record<string, number> = { credential: 0, resource: 1, operation: 2, configuration: 3 };
+    
+    if (seenQuestionKeys.has(key)) {
+      const existingQuestion = seenQuestionKeys.get(key)!;
+      const existingOwnerPriority = ownershipPriority[existingQuestion.ownershipClass || 'value'] ?? 999;
+      const newOwnerPriority = ownershipPriority[question.ownershipClass || 'value'] ?? 999;
+      const existingPriority = categoryPriority[existingQuestion.category] ?? 999;
+      const newPriority = categoryPriority[question.category] ?? 999;
+      
+      // Keep ownership-consistent question first, then fallback to category priority.
+      if (newOwnerPriority < existingOwnerPriority || (newOwnerPriority === existingOwnerPriority && newPriority < existingPriority)) {
+        console.log(`[ComprehensiveQuestions] 🔄 Replacing duplicate question for ${question.nodeId}.${question.fieldName}: ${existingQuestion.category} -> ${question.category} (higher priority)`);
+        seenQuestionKeys.set(key, question);
+      } else {
+        console.log(`[ComprehensiveQuestions] ⏭️  Skipping duplicate question for ${question.nodeId}.${question.fieldName}: ${question.category} (lower priority than ${existingQuestion.category})`);
+      }
+    } else {
+      seenQuestionKeys.set(key, question);
+    }
+  }
+  
+  // Rebuild the deduplicated questions array; merge registry fields; annotate Field Ownership (no row drops)
+  const deduplicatedQuestions = Array.from(seenQuestionKeys.values());
+  const mergedForOwnership = isFullConfigurationMode
+    ? addMissingInputSchemaQuestionsForOwnership(workflow, deduplicatedQuestions)
+    : deduplicatedQuestions;
+  const ownershipAnnotated = annotateQuestionsForOwnershipUi(mergedForOwnership, workflow);
+  const ownershipFilteredQuestions = attachDefaultValuesFromConfig(ownershipAnnotated, workflow);
+  const relevanceAnnotated = annotateQuestionsWithSelectedWorkflowIntelligence(
+    ownershipFilteredQuestions,
+    selectedIntelligence
+  );
+  const relevanceFilteredQuestions = filterQuestionsBySelectedWorkflowIntelligence(relevanceAnnotated);
+  allQuestions.length = 0;
+  allQuestions.push(...relevanceFilteredQuestions);
+  
+  // ✅ CRITICAL: Update nodeQuestionsMap with deduplicated questions
+  const deduplicatedNodeQuestionsMap = new Map<string, ComprehensiveNodeQuestion[]>();
+  for (const question of relevanceFilteredQuestions) {
+    if (!deduplicatedNodeQuestionsMap.has(question.nodeId)) {
+      deduplicatedNodeQuestionsMap.set(question.nodeId, []);
+    }
+    deduplicatedNodeQuestionsMap.get(question.nodeId)!.push(question);
+  }
+  
+  // Sort questions within each node by askOrder
+  for (const [nodeId, questions] of deduplicatedNodeQuestionsMap.entries()) {
+    questions.sort((a, b) => a.askOrder - b.askOrder);
+  }
+  
+  // Update the map
+  nodeQuestionsMap.clear();
+  for (const [nodeId, questions] of deduplicatedNodeQuestionsMap.entries()) {
+    nodeQuestionsMap.set(nodeId, questions);
+  }
+
+  // Sort all questions: primary by node position in workflow (LLM-generated order), then askOrder within each node.
+  // Node type priority heuristic is intentionally NOT used as the primary sort — the workflow.nodes array
+  // already contains the correct semantic order from the LLM and must not be overridden by category guesses.
+  allQuestions.sort((a, b) => {
+    // Primary: preserve LLM-generated node order from workflow.nodes array
+    const aNodeOrder = nodeOrderMap.get(a.nodeId) ?? 999;
+    const bNodeOrder = nodeOrderMap.get(b.nodeId) ?? 999;
+    if (aNodeOrder !== bNodeOrder) {
+      return aNodeOrder - bNodeOrder;
+    }
+
+    // Within same node: sort by askOrder
+    if (a.askOrder !== b.askOrder) {
+      return a.askOrder - b.askOrder;
+    }
+
+    // Same askOrder: credentials first, then operations, then configuration
+    const categoryOrder: Record<string, number> = { credential: 0, resource: 1, operation: 2, configuration: 3 };
+    return (categoryOrder[a.category] ?? 3) - (categoryOrder[b.category] ?? 3);
+  });
+
+  console.log(`[ComprehensiveQuestions] ✅ Generated ${allQuestions.length} total questions (after deduplication) for ${workflow.nodes.length} nodes`);
+  console.log(`[ComprehensiveQuestions] 📋 Questions ordered by node (node-by-node):`);
+  let currentNodeId: string | null = null;
+  allQuestions.forEach((q, idx) => {
+    if (q.nodeId !== currentNodeId) {
+      currentNodeId = q.nodeId;
+      console.log(`[ComprehensiveQuestions]   --- ${q.nodeType} (${q.nodeId}) ---`);
+    }
+    console.log(`[ComprehensiveQuestions]     ${idx + 1}. ${q.fieldName} (${q.category}, askOrder: ${q.askOrder})`);
+  });
+
+  return {
+    questions: allQuestions,
+    nodeQuestionsMap,
+  };
+}
+
+/** Attach connector vault metadata to credential-category questions for wizard filtering. */
+function attachCredentialVaultMetaToQuestions(
+  nodeType: string,
+  questions: ComprehensiveNodeQuestion[]
+): ComprehensiveNodeQuestion[] {
+  return questions.map((q) => {
+    if (q.category !== 'credential') return q;
+    const meta = getCredentialVaultMetaForField(nodeType, q.fieldName);
+    if (!meta) return q;
+    return {
+      ...q,
+      credential: { vaultKey: meta.vaultKey, credentialId: meta.credentialId },
+    };
+  });
+}
+
+/**
+ * Generate credential questions for a node
+ * ✅ ENHANCED: Asks for credential type (API Key OR OAuth Access Token) when both are available
+ */
+function generateCredentialQuestions(
+  node: WorkflowNode,
+  nodeType: string,
+  nodeId: string,
+  nodeLabel: string,
+  config: Record<string, any>,
+  answeredFields: Record<string, any> = {}
+): ComprehensiveNodeQuestion[] {
+  const questions: ComprehensiveNodeQuestion[] = [];
+  const seenFieldNames = new Set<string>(); // Track seen fields to prevent duplicates
+  const schema = nodeLibrary.getSchema(nodeType);
+  if (!schema || !schema.configSchema) {
+    return questions;
+  }
+
+  const requiredFields = schema.configSchema.required || [];
+  const optionalFields = Object.keys(schema.configSchema.optional || {});
+  const allFields = [...requiredFields, ...optionalFields];
+  const unifiedDef = unifiedNodeRegistry.get(nodeType);
+  const fieldIsCredentialOwned = (fieldName: string): boolean => {
+    const fd = unifiedDef?.inputSchema?.[fieldName];
+    if (!fd) return false;
+    return isCredentialOwnership(fieldName, fd);
+  };
+
+  // ✅ ENHANCED: Check if node supports multiple credential types (API Key + OAuth)
+  const hasApiKey = allFields.some(f => f.toLowerCase() === 'apikey' || f.toLowerCase() === 'api_key');
+  const hasAccessToken = allFields.some(f => f.toLowerCase() === 'accesstoken' || f.toLowerCase() === 'access_token');
+  const hasCredentialId = allFields.some(f => f.toLowerCase() === 'credentialid' || f.toLowerCase() === 'credential_id');
+
+  // ✅ CRITICAL: If node supports both API Key and OAuth, ask for credential type first
+  if ((hasApiKey && hasAccessToken) || (hasApiKey && hasCredentialId) || (hasAccessToken && hasCredentialId)) {
+    const apiKeyValue = config.apiKey || config.api_key || '';
+    const accessTokenValue = config.accessToken || config.access_token || '';
+    const credentialIdValue = config.credentialId || config.credential_id || '';
+
+    // If none of the credential fields are populated, ask for credential type
+    if ((!apiKeyValue || apiKeyValue.trim() === '') && 
+        (!accessTokenValue || accessTokenValue.trim() === '') && 
+        (!credentialIdValue || credentialIdValue.trim() === '')) {
+      
+      // Ask for credential type selection
+      const credentialTypeQuestion: ComprehensiveNodeQuestion = {
+        id: `cred_${nodeId}_authType`,
+        text: `Which authentication method should we use for "${nodeLabel}"?`,
+        type: 'select',
+        nodeId,
+        nodeType,
+        nodeLabel,
+        fieldName: 'authType', // Special field name for credential type selection
+        category: 'credential',
+        required: true,
+        askOrder: 0, // Credentials are asked first
+        options: [
+          ...(hasCredentialId ? [{ label: 'Use Stored Credential', value: 'credentialId' }] : []),
+          ...(hasApiKey ? [{ label: 'API Key', value: 'apiKey' }] : []),
+          ...(hasAccessToken ? [{ label: 'OAuth Access Token', value: 'accessToken' }] : []),
+        ],
+        description: `Select authentication method for ${nodeLabel} node`,
+      };
+
+      questions.push(credentialTypeQuestion);
+      console.log(`[ComprehensiveQuestions] Added credential type question for ${nodeType} (supports multiple auth methods)`);
+    }
+  }
+
+  // ✅ ROOT-LEVEL: Get optional schema for field type detection
+  const optionalSchema: any = (schema.configSchema as any).optional || {};
+  
+  // ✅ ROOT-LEVEL: Also check for resource and operation fields in credentials
+  // These should be asked in credentials section with dropdowns (matching node properties)
+  const resourceField = allFields.find(f => {
+    const fLower = f.toLowerCase();
+    return fLower === 'resource' || fLower === 'module' || fLower === 'object';
+  });
+  const operationField = allFields.find(f => {
+    const fLower = f.toLowerCase();
+    return fLower === 'operation' || fLower === 'action' || fLower === 'method';
+  });
+  
+  // Resource/operation are not credentials; keep them outside credential ownership.
+  if (resourceField && fieldIsCredentialOwned(resourceField) && isEmptyValue(config[resourceField])) {
+    const fieldSchema = optionalSchema[resourceField] || {};
+    // ✅ WORLD-CLASS: Only use explicit options, NOT examples
+    const fieldOptions = fieldSchema.options || []; // ✅ CRITICAL: Don't use examples as options
+    const hasOptions = Array.isArray(fieldOptions) && fieldOptions.length > 0;
+    
+    if (hasOptions || requiredFields.includes(resourceField)) {
+      const question: ComprehensiveNodeQuestion = {
+        id: `cred_${nodeId}_${resourceField}`, // ✅ Node-specific
+        text: `Which ${getProviderName(nodeType)} ${resourceField} should "${nodeLabel}" use?`,
+        type: hasOptions ? 'select' : 'text',
+        nodeId,
+        nodeType,
+        nodeLabel,
+        fieldName: resourceField,
+        category: 'resource',
+        required: requiredFields.includes(resourceField),
+        askOrder: 0.6, // After API keys/OAuth
+        description: `${resourceField} for ${nodeLabel} node`,
+        options: hasOptions ? fieldOptions.map((opt: any) => ({
+          label: typeof opt === 'string' ? opt : (opt.label || opt.value),
+          value: typeof opt === 'string' ? opt : opt.value,
+        })) : undefined,
+      };
+      questions.push(question);
+      seenFieldNames.add(resourceField);
+      console.log(`[ComprehensiveQuestions] ✅ Added resource question for ${nodeType}.${resourceField} (dropdown: ${hasOptions})`);
+    }
+  }
+  
+  if (operationField && fieldIsCredentialOwned(operationField) && isEmptyValue(config[operationField])) {
+    const fieldSchema = optionalSchema[operationField] || {};
+    // ✅ WORLD-CLASS: Only use explicit options, NOT examples
+    // Examples are just hints, not selectable dropdown options
+    const fieldOptions = fieldSchema.options || []; // ✅ CRITICAL: Don't use examples as options
+    const hasExplicitOptions = Array.isArray(fieldOptions) && fieldOptions.length > 0;
+    
+    if (hasExplicitOptions || requiredFields.includes(operationField)) {
+      const question: ComprehensiveNodeQuestion = {
+        id: `cred_${nodeId}_${operationField}`, // ✅ Node-specific
+        text: `What ${getProviderName(nodeType)} operation should "${nodeLabel}" perform?`,
+        type: hasExplicitOptions ? 'select' : 'text', // ✅ Only dropdown if explicit options exist
+        nodeId,
+        nodeType,
+        nodeLabel,
+        fieldName: operationField,
+        category: 'operation',
+        required: requiredFields.includes(operationField),
+        askOrder: 0.7, // After resources
+        description: `Operation for ${nodeLabel} node`,
+        options: hasExplicitOptions ? fieldOptions.map((opt: any) => ({
+          label: typeof opt === 'string' ? opt : (opt.label || opt.value),
+          value: typeof opt === 'string' ? opt : opt.value,
+        })) : undefined,
+      };
+      questions.push(question);
+      seenFieldNames.add(operationField);
+      console.log(`[ComprehensiveQuestions] ✅ Added operation question for ${nodeType}.${operationField} (dropdown: ${hasExplicitOptions})`);
+    }
+  }
+
+  // Check for credential fields and generate questions
+  for (const fieldName of allFields) {
+    const fieldLower = fieldName.toLowerCase();
+
+    // ✅ IMPORTANT: Some nodes (especially triggers) have boolean flags that contain "auth"
+    // e.g. form.requireAuthentication (boolean). These are NOT credentials and should not
+    // generate "connection" questions.
+    const optionalSchema: any = (schema.configSchema as any).optional || {};
+    const fieldSchema = optionalSchema[fieldName];
+    const fieldType = fieldSchema?.type;
+    if (fieldType === 'boolean') {
+      continue;
+    }
+
+    // Explicitly exclude known non-credential fields that include auth-like words
+    // (keeps heuristic credential detection accurate)
+    if (fieldLower === 'requireauthentication' || fieldLower === 'authenticationrequired') {
+      continue;
+    }
+
+    // ✅ CRITICAL: Exclude known configuration fields that are NOT credentials
+    // These fields contain credential-like words but are actually configuration
+    // NOTE: URLs are now treated as credentials (baseUrl, apiUrl, endpoint, etc.)
+    // Only specific URL types (webhook, callback, redirect) remain as configuration
+    // ✅ SPECIAL: Gmail "to" field is handled as credential with dropdown (excluded from this check)
+    const isConfigurationField = 
+      // NOTE: webhook URLs are credential-like in many integrations.
+      // Do not hard-exclude them here; rely on registry ownership classification instead.
+      fieldLower === 'callbackurl' || fieldLower === 'callback_url' || // OAuth callback URL is configuration
+      fieldLower === 'redirecturl' || fieldLower === 'redirect_url' || // OAuth redirect URL is configuration
+      fieldLower.includes('message') || // Message fields are not credentials
+      fieldLower.includes('channel') || // Channel fields are not credentials
+      fieldLower.includes('text') || // Text fields are not credentials
+      fieldLower.includes('subject') || // Subject fields are not credentials
+      fieldLower.includes('body') || // Body fields are not credentials
+      (fieldLower.includes('to') && nodeType !== 'google_gmail') || // To fields are not credentials (except Gmail)
+      fieldLower.includes('from'); // From fields are not credentials
+    
+    if (isConfigurationField) {
+      continue; // Skip configuration fields - they should be asked as configuration questions, not credentials
+    }
+
+    const unifiedField = unifiedNodeRegistry.get(nodeType)?.inputSchema?.[fieldName];
+    const vaultMeta = getCredentialVaultMetaForField(nodeType, fieldName);
+    const isCredentialField = !!vaultMeta || (!!unifiedField && isCredentialOwnership(fieldName, unifiedField));
+
+    if (isCredentialField) {
+      // ✅ CRITICAL: Skip if we've already seen this field (prevent duplicates)
+      if (seenFieldNames.has(fieldName)) {
+        console.log(`[ComprehensiveQuestions] Skipping duplicate credential field: ${nodeType}.${fieldName}`);
+        continue;
+      }
+      
+      // ✅ ENHANCED: Skip OAuth credentials - these should be handled via credential connection UI, not text questions
+      // Check if node requires OAuth by checking unified node registry
+      if (fieldLower.includes('credentialid') || fieldLower.includes('credential_id')) {
+        const nodeDef = unifiedNodeRegistry.get(nodeType);
+        if (nodeDef?.credentialSchema?.requirements) {
+          const hasOAuthRequirement = nodeDef.credentialSchema.requirements.some(
+            (req: any) => req.category === 'oauth' || req.type === 'oauth'
+          );
+          if (hasOAuthRequirement) {
+            console.log(`[ComprehensiveQuestions] Skipping OAuth credentialId for ${nodeType} - handled via credential connection UI`);
+            continue; // Skip OAuth credentials - handled via UI connection, not questions
+          }
+        }
+      }
+      
+      const fieldValue = config[fieldName];
+      // ✅ FIX: Use universal isEmpty check
+      if (isEmptyValue(fieldValue)) {
+        // Mark field as seen to prevent duplicates
+        seenFieldNames.add(fieldName);
+        
+        // Generate credential question
+        // ✅ ENHANCED: Handle URL fields with appropriate question text
+        const isUrlField = fieldLower.includes('url') || 
+                          fieldLower.includes('endpoint') || 
+                          fieldLower === 'baseurl' || 
+                          fieldLower === 'base_url' ||
+                          fieldLower === 'apiurl' ||
+                          fieldLower === 'api_url' ||
+                          fieldLower === 'host' ||
+                          fieldLower === 'hostname' ||
+                          fieldLower === 'server';
+        
+        let questionText: string;
+        let placeholder: string;
+        
+        if (hasCredentialId && fieldLower.includes('credentialid')) {
+          questionText = `Which ${getProviderName(nodeType)} connection should we use for "${nodeLabel}"?`;
+          placeholder = 'Select credential';
+        } else if (isUrlField) {
+          questionText = `What is the ${fieldName} for "${nodeLabel}"?`;
+          placeholder = fieldLower.includes('base') ? 'Enter base URL (e.g., https://api.example.com)' :
+                       fieldLower.includes('api') ? 'Enter API URL' :
+                       fieldLower.includes('endpoint') ? 'Enter endpoint URL' :
+                       'Enter URL';
+        } else if (hasApiKey && fieldLower.includes('api')) {
+          questionText = `What is your ${getProviderName(nodeType)} API Key for "${nodeLabel}"?`;
+          placeholder = 'Enter API Key';
+        } else if (hasAccessToken && fieldLower.includes('access')) {
+          questionText = `What is your ${getProviderName(nodeType)} OAuth Access Token for "${nodeLabel}"?`;
+          placeholder = 'Enter OAuth Access Token';
+        } else {
+          questionText = `Which ${getProviderName(nodeType)} connection should we use for "${nodeLabel}"?`;
+          placeholder = 'Select credential';
+        }
+        
+        // ✅ SIMPLIFIED: Google Sheets spreadsheetId - single input field (no dropdown)
+        if ((nodeType === 'google_sheets' || nodeType === 'google_sheets_read' || nodeType === 'google_sheets_write') && fieldLower === 'spreadsheetid') {
+          const spreadsheetIdQuestion: ComprehensiveNodeQuestion = {
+            id: `cred_${nodeId}_${fieldName}`,
+            text: `Enter Google Sheets spreadsheet ID or URL for "${nodeLabel}"?`,
+            type: 'text',
+            nodeId,
+            nodeType,
+            nodeLabel,
+            fieldName: 'spreadsheetId',
+            category: 'credential',
+            required: true,
+            askOrder: 0.5, // After credential type selection
+            description: `Enter the Google Sheets spreadsheet ID or full URL. Both formats work.`,
+            placeholder: '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms or https://docs.google.com/spreadsheets/d/...',
+          };
+          questions.push(spreadsheetIdQuestion);
+          console.log(`[ComprehensiveQuestions] Added Google Sheets spreadsheetId input field (no dropdown) for ${nodeType}.${fieldName}`);
+        }
+        // ✅ SPECIAL HANDLING: Google Docs "documentId" field with dropdown options
+        else if ((nodeType === 'google_docs' || nodeType === 'google_doc') && fieldLower === 'documentid') {
+          const documentIdQuestion: ComprehensiveNodeQuestion = {
+            id: `cred_${nodeId}_${fieldName}`,
+            text: `How should we get the Google Docs document ID or URL for "${nodeLabel}"?`,
+            type: 'select',
+            nodeId,
+            nodeType,
+            nodeLabel,
+            fieldName: 'documentId',
+            category: 'credential',
+            required: true,
+            askOrder: 0.5, // After credential type selection
+            description: `Select how to provide the document ID or URL for ${nodeLabel} node`,
+            options: [
+              { label: 'Enter URL', value: 'url' },
+              { label: 'Enter ID', value: 'id' },
+            ],
+          };
+          questions.push(documentIdQuestion);
+          console.log(`[ComprehensiveQuestions] Added Google Docs "documentId" field question with dropdown options for ${nodeType}.${fieldName}`);
+        } else {
+          // ✅ ROOT-LEVEL FIX: Use node schema to determine field type (matches node properties)
+          const optionalSchema: any = (schema.configSchema as any).optional || {};
+          const fieldSchema = optionalSchema[fieldName] || {};
+          const fieldType = fieldSchema.type || 'string';
+          const control = getInputControlMetadata(fieldName, {
+            ...fieldSchema,
+            ui: {
+              ...(fieldSchema.ui || {}),
+              options: fieldSchema.ui?.options || fieldSchema.options,
+            },
+          });
+          let questionType: string = control.inputType === 'json' ? 'textarea' : control.inputType;
+          let questionOptions: Array<{ label: string; value: string }> | undefined = control.options;
+
+          if (hasCredentialId && fieldLower.includes('credentialid')) {
+            questionType = 'credential';
+          } else {
+            if (questionType === 'select' && (!questionOptions || questionOptions.length === 0)) {
+              questionType = 'text';
+            }
+            if (!questionType || questionType === 'json') {
+              questionType = mapQuestionType(fieldType);
+            }
+            console.log(`[ComprehensiveQuestions] ✅ Using ${questionType} for ${nodeType}.${fieldName} (schema-driven mapper)`);
+          }
+          
+          const question: ComprehensiveNodeQuestion = {
+            id: `cred_${nodeId}_${fieldName}`, // ✅ Node-specific: includes nodeId
+            text: questionText,
+            type: questionType,
+            nodeId, // ✅ Node-specific: ensures credentials go to correct node
+            nodeType,
+            nodeLabel,
+            fieldName,
+            category: 'credential',
+            required: requiredFields.includes(fieldName),
+            askOrder: 0.5, // After credential type selection (0.5 so it comes after authType question)
+            description: `Credential required for ${nodeLabel} node`,
+            placeholder,
+            options: questionOptions, // ✅ ROOT-LEVEL: Dropdown options for resources/operations
+          };
+
+          questions.push(question);
+          console.log(`[ComprehensiveQuestions] ✅ Added credential question for ${nodeType}.${fieldName} (type: ${questionType}, nodeId: ${nodeId})`);
+        }
+      }
+    }
+  }
+
+  const primaryCredential = getPrimaryCredentialFieldForNode(nodeType);
+  if (primaryCredential && !seenFieldNames.has(primaryCredential.fieldName)) {
+    const existingQuestion = questions.find((q) => q.fieldName === primaryCredential.fieldName);
+    const existingValue = config[primaryCredential.fieldName];
+    if (!existingQuestion && isEmptyValue(existingValue)) {
+      seenFieldNames.add(primaryCredential.fieldName);
+      questions.push({
+        id: `cred_${nodeId}_${primaryCredential.fieldName}`,
+        text: `What ${primaryCredential.displayName || primaryCredential.fieldName} should "${nodeLabel}" use?`,
+        type: primaryCredential.fieldName.toLowerCase().includes('credential') ? 'credential' : 'password',
+        nodeId,
+        nodeType,
+        nodeLabel,
+        fieldName: primaryCredential.fieldName,
+        category: 'credential',
+        required: true,
+        askOrder: 0.5,
+        description: `Credential required for ${nodeLabel} node`,
+        credential: {
+          vaultKey: primaryCredential.vaultKey,
+          credentialId: primaryCredential.credentialId,
+        },
+      });
+    }
+  }
+
+  return attachCredentialVaultMetaToQuestions(nodeType, questions);
+}
+
+/**
+ * Generate resource questions for a node (e.g., HubSpot resource: contact, company, deal)
+ */
+function generateResourceQuestions(
+  node: WorkflowNode,
+  nodeType: string,
+  nodeId: string,
+  nodeLabel: string,
+  config: Record<string, any>,
+  schema: any
+): ComprehensiveNodeQuestion[] {
+  const questions: ComprehensiveNodeQuestion[] = [];
+
+  // Check if node has a resource field (common in CRM nodes)
+  const requiredFields = schema.configSchema.required || [];
+  const optionalFields = Object.keys(schema.configSchema.optional || {});
+  const allFields = [...requiredFields, ...optionalFields];
+
+  console.log(`[ComprehensiveQuestions] 🔍 Checking for resource field in ${nodeType}`);
+  console.log(`[ComprehensiveQuestions]   Required fields: [${requiredFields.join(', ')}]`);
+  console.log(`[ComprehensiveQuestions]   Optional fields: [${optionalFields.join(', ')}]`);
+
+  // ✅ WORLD-CLASS: Check for resource fields (predefined choices, NOT user-provided IDs)
+  // Resource fields are dropdowns with predefined options (e.g., HubSpot: contact, company, deal)
+  // ID fields (spreadsheetId, tableId, documentId) are NOT resources - they're user-provided text inputs
+  const hasResourceField = allFields.some(field => {
+    const fieldLower = field.toLowerCase();
+    return fieldLower === 'resource' || 
+           fieldLower === 'module' ||
+           fieldLower === 'object' ||
+           fieldLower === 'table' && !fieldLower.includes('id') && !fieldLower.includes('name'); // table (resource), not tableId or tableName
+           // ✅ EXCLUDED: ID fields are NOT resources (they're user-provided text inputs)
+           // spreadsheetId, tableId, documentId, calendarId, etc. should be text inputs
+  });
+
+  console.log(`[ComprehensiveQuestions]   Has resource field: ${hasResourceField}`);
+
+  if (hasResourceField) {
+    // ✅ WORLD-CLASS: Find resource field (predefined choices, NOT user-provided IDs)
+    // Resource fields are dropdowns with predefined options (e.g., HubSpot: contact, company, deal)
+    // ID fields (spreadsheetId, tableId, documentId) are NOT resources - they're user-provided text inputs
+    const resourceField = allFields.find(field => {
+      const fieldLower = field.toLowerCase();
+      return fieldLower === 'resource' || 
+             fieldLower === 'module' ||
+             fieldLower === 'object' ||
+             (fieldLower === 'table' && !fieldLower.includes('id') && !fieldLower.includes('name')); // table (resource), not tableId or tableName
+             // ✅ EXCLUDED: ID fields are NOT resources (they're user-provided text inputs)
+             // spreadsheetId, tableId, documentId, calendarId, etc. should be text inputs
+    });
+
+    if (resourceField) {
+      const resourceValue = config[resourceField];
+      const isRequired = requiredFields.includes(resourceField);
+      
+      // ✅ FIX: Use universal isEmpty check
+      const isEmpty = isEmptyValue(resourceValue);
+
+      // ✅ ARCHITECTURAL FIX: Resource fields should NOT be asked - they're AI-generated
+      // Only credentials are asked. This check should never be reached if categories=['credential'] is used
+      // But keeping for backward compatibility if someone explicitly requests resource questions
+      if (isEmpty || isRequired) {
+        console.log(`[ComprehensiveQuestions] ✅ Generating resource question for ${resourceField} (required: ${isRequired}, isEmpty: ${isEmpty}, value: ${resourceValue})`);
+        // Get resource options from schema or node-question-order
+        const fieldInfo = schema.configSchema.optional?.[resourceField];
+        
+        let options: Array<{ label: string; value: string }> = [];
+        
+        // Try to get options from node-question-order system
+        const questionConfig = getQuestionConfig(nodeType);
+        if (questionConfig) {
+          const resourceQuestion = questionConfig.questions.find(q => 
+            q.field === resourceField || 
+            q.field.toLowerCase().includes('resource') ||
+            q.field.toLowerCase().includes('module')
+          );
+          if (resourceQuestion?.options) {
+            options = resourceQuestion.options.map(opt => ({
+              label: typeof opt === 'string' ? opt : (opt.label || opt.value),
+              value: typeof opt === 'string' ? opt : opt.value,
+            }));
+          }
+        }
+
+        // ✅ WORLD-CLASS: Don't use examples as options - they're just hints
+        // Only use explicit options from schema
+        // Examples are not selectable dropdown options
+
+        // ✅ ENHANCED: Fallback options based on node type
+        if (options.length === 0) {
+          // Node-specific fallback options
+          if (nodeType.includes('hubspot') || nodeType.includes('zoho') || nodeType.includes('pipedrive')) {
+            // CRM nodes
+            options = [
+              { label: 'Contact', value: 'contact' },
+              { label: 'Company', value: 'company' },
+              { label: 'Deal', value: 'deal' },
+              { label: 'Ticket', value: 'ticket' },
+              { label: 'Lead', value: 'lead' },
+            ];
+          } else if (nodeType.includes('airtable')) {
+            // Airtable - baseId and tableId are separate fields, handled individually
+            options = [];
+          } else if (nodeType.includes('google_sheets')) {
+            // Google Sheets - spreadsheetId is handled separately
+            options = [];
+          } else if (nodeType.includes('google_doc')) {
+            // Google Docs - documentId is handled separately
+            options = [];
+          } else if (nodeType.includes('google_calendar')) {
+            // Google Calendar - calendarId is handled separately
+            options = [];
+          } else if (nodeType.includes('slack')) {
+            // Slack - channel is a resource
+            options = [
+              { label: 'General', value: 'general' },
+              { label: 'Random', value: 'random' },
+            ];
+          } else if (nodeType.includes('github')) {
+            // GitHub - repo is a resource
+            options = [];
+          } else if (nodeType.includes('facebook')) {
+            // Facebook - pageId is a resource
+            options = [];
+          } else {
+            // Generic fallback for other nodes
+            options = [
+              { label: 'Resource', value: 'resource' },
+              { label: 'Item', value: 'item' },
+              { label: 'Record', value: 'record' },
+            ];
+          }
+        }
+
+        // Ensure all options have both label and value
+        const validOptions = options
+          .filter(opt => opt && opt.value)
+          .map(opt => ({
+            label: opt.label || opt.value,
+            value: opt.value,
+          }));
+
+        // ✅ ENHANCED: Determine question type based on field name
+        // ID fields (baseId, tableId, spreadsheetId, etc.) should be text inputs, not selects
+        const isIdField = resourceField.toLowerCase().includes('id') || 
+                         resourceField.toLowerCase().includes('url');
+        const questionType = isIdField ? 'text' : (validOptions.length > 0 ? 'select' : 'text');
+        
+        const question: ComprehensiveNodeQuestion = {
+          id: `resource_${nodeId}_${resourceField}`,
+          text: isIdField 
+            ? `What is the ${getProviderName(nodeType)} ${resourceField} for "${nodeLabel}"?`
+            : `Which ${getProviderName(nodeType)} ${resourceField} are we working with?`,
+          type: questionType,
+          nodeId,
+          nodeType,
+          nodeLabel,
+          fieldName: resourceField,
+          category: 'configuration',
+          required: requiredFields.includes(resourceField),
+          options: questionType === 'select' && validOptions.length > 0 ? validOptions : undefined,
+          askOrder: 1, // Resources are asked after credentials, before operations
+          description: isIdField 
+            ? `${resourceField} identifier for ${nodeLabel} node`
+            : `${resourceField} type for ${nodeLabel} node`,
+          placeholder: isIdField ? `Enter ${resourceField}` : undefined,
+        };
+
+        questions.push(question);
+        console.log(`[ComprehensiveQuestions] Added resource question for ${nodeType}.${resourceField}`);
+      }
+    }
+  }
+
+  return questions;
+}
+
+/**
+ * Generate operation questions for a node
+ */
+function generateOperationQuestions(
+  node: WorkflowNode,
+  nodeType: string,
+  nodeId: string,
+  nodeLabel: string,
+  config: Record<string, any>,
+  schema: any
+): ComprehensiveNodeQuestion[] {
+  const questions: ComprehensiveNodeQuestion[] = [];
+
+  // Check if node has an operation field
+  const requiredFields = schema.configSchema.required || [];
+  const optionalFields = Object.keys(schema.configSchema.optional || {});
+  const allFields = [...requiredFields, ...optionalFields];
+
+  console.log(`[ComprehensiveQuestions] 🔍 Checking for operation field in ${nodeType}`);
+  console.log(`[ComprehensiveQuestions]   Required fields: [${requiredFields.join(', ')}]`);
+  console.log(`[ComprehensiveQuestions]   Optional fields: [${optionalFields.join(', ')}]`);
+
+  // ✅ CRITICAL: Check node-question-order FIRST for operation field
+  // Some nodes (like LinkedIn) have operation in node-question-order but not in schema
+  const questionConfig = getQuestionConfig(nodeType);
+  let operationFieldFromConfig: string | null = null;
+  let operationQuestionFromConfig: any = null;
+  
+  if (questionConfig) {
+    operationQuestionFromConfig = questionConfig.questions.find(q => 
+      q.field === 'operation' || q.field.toLowerCase().includes('operation')
+    );
+    if (operationQuestionFromConfig) {
+      operationFieldFromConfig = operationQuestionFromConfig.field;
+      console.log(`[ComprehensiveQuestions] ✅ Found operation field in node-question-order: ${operationFieldFromConfig}`);
+    }
+  }
+
+  // ✅ ENHANCED: Check for operation fields with more variations
+  // Some nodes use 'action', 'method', 'type' instead of 'operation'
+  const hasOperationFieldInSchema = allFields.some(field => {
+    const fieldLower = field.toLowerCase();
+    return fieldLower === 'operation' || 
+           fieldLower.includes('operation') ||
+           (fieldLower === 'action' && nodeType.includes('http')) || // HTTP methods
+           (fieldLower === 'method' && nodeType.includes('http')); // HTTP methods
+  });
+
+  const hasOperationField = hasOperationFieldInSchema || !!operationFieldFromConfig;
+  console.log(`[ComprehensiveQuestions]   Has operation field in schema: ${hasOperationFieldInSchema}`);
+  console.log(`[ComprehensiveQuestions]   Has operation field in node-question-order: ${!!operationFieldFromConfig}`);
+  console.log(`[ComprehensiveQuestions]   Has operation field (combined): ${hasOperationField}`);
+
+  if (hasOperationField) {
+    // ✅ CRITICAL: Use operation field from node-question-order if available, otherwise from schema
+    const operationField =
+      operationFieldFromConfig ||
+      allFields.find((field) => {
+        const fieldLower = field.toLowerCase();
+        return (
+          fieldLower === 'operation' ||
+          fieldLower.includes('operation') ||
+          (fieldLower === 'method' && nodeType.includes('http')) ||
+          (fieldLower === 'action' && nodeType.includes('http'))
+        );
+      });
+
+    if (operationField) {
+      const operationValue = config[operationField];
+      // ✅ CRITICAL: Check if required in schema OR in node-question-order
+      const isRequiredInSchema = requiredFields.includes(operationField);
+      const isRequiredInConfig = operationQuestionFromConfig?.required || false;
+      const unifiedOp = unifiedNodeRegistry.get(nodeType);
+      const opFd = unifiedOp?.inputSchema?.[operationField] as any;
+      const isRequiredRegistry = computeFieldRequiredBeforeExecution(
+        nodeType,
+        operationField,
+        opFd,
+        config as Record<string, unknown>
+      );
+      const isRequired = isRequiredInSchema || isRequiredInConfig || isRequiredRegistry;
+      
+      console.log(`[ComprehensiveQuestions]   Operation field: ${operationField}`);
+      console.log(`[ComprehensiveQuestions]   Required in schema: ${isRequiredInSchema}`);
+      console.log(`[ComprehensiveQuestions]   Required in config: ${isRequiredInConfig}`);
+      console.log(`[ComprehensiveQuestions]   Is required (combined): ${isRequired}`);
+      
+      // ✅ FIX: Use universal isEmpty check
+      const isEmpty = isEmptyValue(operationValue);
+
+      // ✅ ARCHITECTURAL FIX: Operation fields should NOT be asked - they're AI-generated
+      // Only credentials are asked. This check should never be reached if categories=['credential'] is used
+      // But keeping for backward compatibility if someone explicitly requests operation questions
+      if (isEmpty || isRequired) {
+        console.log(`[ComprehensiveQuestions] ✅ Generating operation question for ${operationField} (required: ${isRequired}, isEmpty: ${isEmpty}, value: ${operationValue})`);
+        console.log(`[ComprehensiveQuestions]   Field is in required array: ${requiredFields.includes(operationField)}`);
+        console.log(`[ComprehensiveQuestions]   Will generate question: ${isEmpty || isRequired}`);
+        // Get operation options from schema or node-question-order
+        const fieldInfo = schema.configSchema.optional?.[operationField] || 
+                         schema.configSchema.required?.find((f: string) => f === operationField);
+        
+        let options: Array<{ label: string; value: string }> = [];
+        
+        // ✅ CRITICAL: Try to get options from node-question-order system FIRST
+        // This ensures we get the correct options even if field is not in schema
+        if (operationQuestionFromConfig?.options) {
+          options = operationQuestionFromConfig.options.map((opt: any) => ({
+            label: typeof opt === 'string' ? opt : (opt.label || opt.value),
+            value: typeof opt === 'string' ? opt : opt.value,
+          }));
+          console.log(`[ComprehensiveQuestions]   Got options from node-question-order: [${options.map(o => o.value).join(', ')}]`);
+        } else if (questionConfig) {
+          const operationQuestion = questionConfig.questions.find(q => 
+            q.field === operationField || q.field.toLowerCase().includes('operation')
+          );
+          if (operationQuestion?.options) {
+            options = operationQuestion.options.map((opt: any) => ({
+              label: typeof opt === 'string' ? opt : (opt.label || opt.value),
+              value: typeof opt === 'string' ? opt : opt.value,
+            }));
+            console.log(`[ComprehensiveQuestions]   Got options from node-question-order (fallback): [${options.map(o => o.value).join(', ')}]`);
+          }
+        }
+
+        // Fallback: Try to get options from schema
+        if (options.length === 0 && fieldInfo?.options) {
+          options = fieldInfo.options.map((opt: any) => ({
+            label: typeof opt === 'string' ? opt : (opt.label || opt.value),
+            value: typeof opt === 'string' ? opt : opt.value,
+          }));
+        }
+
+        // Fallback: Use common operations if no options found
+        if (options.length === 0) {
+          const opLower = operationField.toLowerCase();
+          if (opLower === 'method' && nodeType.includes('http')) {
+            options = [
+              { label: 'GET', value: 'GET' },
+              { label: 'POST', value: 'POST' },
+              { label: 'PUT', value: 'PUT' },
+              { label: 'PATCH', value: 'PATCH' },
+              { label: 'DELETE', value: 'DELETE' },
+            ];
+          } else {
+            options = [
+              { label: 'Get', value: 'get' },
+              { label: 'Get Many', value: 'getMany' },
+              { label: 'Create', value: 'create' },
+              { label: 'Update', value: 'update' },
+              { label: 'Delete', value: 'delete' },
+              { label: 'Search', value: 'search' },
+            ];
+          }
+        }
+        
+        // ✅ CRITICAL: If still no options and operation is required, use node-question-order default
+        if (options.length === 0 && isRequired && operationQuestionFromConfig?.default) {
+          // Don't add default as option, but log it for debugging
+          console.log(`[ComprehensiveQuestions]   Operation has default value: ${operationQuestionFromConfig.default}`);
+        }
+
+        // Ensure all options have both label and value
+        const validOptions = options
+          .filter(opt => opt && opt.value)
+          .map(opt => ({
+            label: opt.label || opt.value,
+            value: opt.value,
+          }));
+
+        // ✅ ENHANCED: Context-aware operation question text based on node type
+        let operationQuestionText = `What operation should "${nodeLabel}" perform?`;
+        if (nodeType.includes('crm') || nodeType.includes('hubspot') || nodeType.includes('zoho') || nodeType.includes('pipedrive')) {
+          operationQuestionText = `What ${getProviderName(nodeType)} operation should "${nodeLabel}" perform?`;
+        } else if (nodeType.includes('http')) {
+          operationQuestionText = `What HTTP method should "${nodeLabel}" use?`;
+        } else if (nodeType.includes('google') || nodeType.includes('airtable') || nodeType.includes('notion')) {
+          operationQuestionText = `What ${getProviderName(nodeType)} operation should "${nodeLabel}" perform?`;
+        } else if (nodeType.includes('social') || nodeType.includes('linkedin') || nodeType.includes('twitter') || nodeType.includes('facebook') || nodeType.includes('instagram')) {
+          operationQuestionText = `What action should "${nodeLabel}" perform?`;
+        }
+        
+        const question: ComprehensiveNodeQuestion = {
+          id: `op_${nodeId}_${operationField}`,
+          text: operationQuestionText,
+          type: 'select',
+          nodeId,
+          nodeType,
+          nodeLabel,
+          fieldName: operationField,
+          category: 'operation',
+          required: isRequired, // ✅ CRITICAL: Use combined isRequired (schema OR config)
+          options: validOptions.length > 0 ? validOptions : undefined,
+          askOrder: 2, // Operations are asked after credentials and resources
+          description: `Operation to perform in ${nodeLabel} node`,
+        };
+
+        questions.push(question);
+        console.log(`[ComprehensiveQuestions] ✅ SUCCESS: Added operation question for ${nodeType}.${operationField}`);
+        console.log(`[ComprehensiveQuestions]   Question ID: op_${nodeId}_${operationField}`);
+        console.log(`[ComprehensiveQuestions]   Question text: "${question.text}"`);
+        console.log(`[ComprehensiveQuestions]   Options count: ${validOptions.length}`);
+        console.log(`[ComprehensiveQuestions]   Options: [${validOptions.map(o => o.value).join(', ')}]`);
+      } else {
+        console.warn(`[ComprehensiveQuestions] ⚠️ SKIPPED operation question for ${nodeType}.${operationField}`);
+        console.warn(`[ComprehensiveQuestions]   Reason: isEmpty=${isEmpty}, isRequired=${isRequired}`);
+        console.warn(`[ComprehensiveQuestions]   Condition: isEmpty || isRequired = ${isEmpty || isRequired}`);
+        console.warn(`[ComprehensiveQuestions]   Current value: "${operationValue}"`);
+      }
+    } else {
+      console.warn(`[ComprehensiveQuestions] ⚠️ Operation field variable found but field not in allFields`);
+      console.warn(`[ComprehensiveQuestions]   allFields: [${allFields.join(', ')}]`);
+    }
+  } else {
+    console.log(`[ComprehensiveQuestions] ℹ️ ${nodeType} does not have an operation field`);
+    console.log(`[ComprehensiveQuestions]   allFields checked: [${allFields.join(', ')}]`);
+  }
+
+  console.log(`[ComprehensiveQuestions] 📊 Operation questions generated: ${questions.length} for ${nodeType}`);
+  return questions;
+}
+
+/**
+ * Generate configuration questions for other required fields
+ */
+function generateConfigurationQuestions(
+  node: WorkflowNode,
+  nodeType: string,
+  nodeId: string,
+  nodeLabel: string,
+  config: Record<string, any>,
+  schema: any,
+  answeredFields: Record<string, any>,
+  includeFilledFields: boolean = false
+): ComprehensiveNodeQuestion[] {
+  const questions: ComprehensiveNodeQuestion[] = [];
+
+  // Use node-question-order system if available
+  const questionConfig = getQuestionConfig(nodeType);
+  if (questionConfig) {
+    // Merge node config as the base so dependsOn conditions evaluate against
+    // actual stored values (e.g. operation='append'), not empty answeredFields.
+    const effectiveAnsweredFields = { ...config, ...answeredFields };
+    const orderedQuestions = getOrderedQuestions(nodeType, effectiveAnsweredFields);
+    
+    const unifiedForOrdered = unifiedNodeRegistry.get(nodeType);
+    const fieldPolicyForOrdered = unifiedForOrdered
+      ? resolveFieldPolicyForNode(unifiedForOrdered, config as Record<string, unknown>)
+      : null;
+    for (const qDef of orderedQuestions) {
+      // Skip if already asked (credential or operation)
+      if (qDef.type === 'credential' || qDef.field.toLowerCase().includes('operation')) {
+        continue;
+      }
+      const orderedFd = unifiedForOrdered?.inputSchema?.[qDef.field];
+      if (fieldPolicyForOrdered?.fields[qDef.field]?.active === false) {
+        continue;
+      }
+      if (orderedFd && isCredentialOwnership(qDef.field, orderedFd)) {
+        continue;
+      }
+      if (orderedFd && shouldHidePassiveStructuralField(unifiedForOrdered?.category, qDef.field, orderedFd, config as Record<string, any>)) {
+        continue;
+      }
+      if (orderedFd && unifiedForOrdered?.inputSchema) {
+        const mode = resolveEffectiveFieldFillMode(qDef.field, unifiedForOrdered.inputSchema, config as Record<string, any>);
+        const hasExplicitFillMode = config._fillMode?.[qDef.field] !== undefined;
+        if (mode === 'runtime_ai' && !hasExplicitFillMode && !isEmptyValue(config[qDef.field])) {
+          continue;
+        }
+      }
+
+      // Check if field is already populated
+      const fieldValue = config[qDef.field];
+      // ✅ FIX: Use universal isEmpty check
+      const isEmpty = isEmptyValue(fieldValue);
+
+      // ✅ ARCHITECTURAL FIX: Configuration fields should NOT be asked - they're AI-generated
+      // Only credentials are asked. This check should never be reached if categories=['credential'] is used
+      // But keeping for backward compatibility if someone explicitly requests configuration questions
+      const shouldAsk = (includeFilledFields || isEmpty) && (qDef.required || qDef.askOrder >= 2 || includeFilledFields);
+      
+      if (shouldAsk) {
+        // ✅ ARCHITECTURAL REFACTOR: Filter out JSON template expression options
+        // AI Input Resolver will generate inputs dynamically - no manual JSON selection
+        let validOptions: Array<{ label: string; value: string }> | undefined = undefined;
+        if (qDef.options && qDef.options.length > 0) {
+          validOptions = qDef.options
+            .filter(opt => {
+              if (!opt) return false;
+              const optValue = typeof opt === 'string' ? opt : opt.value;
+              // Filter out any options containing {{$json.*}} template expressions
+              if (typeof optValue === 'string' && optValue.includes('{{$json.')) {
+                return false; // Remove JSON template options
+              }
+              return true;
+            })
+            .map(opt => ({
+              label: typeof opt === 'string' ? opt : (opt.label || opt.value),
+              value: typeof opt === 'string' ? opt : opt.value,
+            }));
+          
+          // If all options were filtered out (were JSON templates), set to undefined
+          // This will show "AI will generate this dynamically" in UI
+          if (validOptions.length === 0) {
+            validOptions = undefined;
+          }
+        }
+
+        const unifiedRequired = computeFieldRequiredBeforeExecution(
+          nodeType,
+          qDef.field,
+          orderedFd as any,
+          config as Record<string, unknown>
+        );
+        // Derive fillModeDefault from registry so the frontend wizard knows whether
+        // this field is AI-owned (buildtime_ai_once / runtime_ai) or user-owned (manual_static).
+        // Without this, the wizard defaults every field to manual_static and shows it as a
+        // question even when the AI already populated it during property_population.
+        const registryFillModeDefault = (unifiedForOrdered?.inputSchema?.[qDef.field] as any)?.fillMode?.default as
+          | 'manual_static'
+          | 'runtime_ai'
+          | 'buildtime_ai_once'
+          | undefined;
+        const question: ComprehensiveNodeQuestion = {
+          id: `config_${nodeId}_${qDef.field}`,
+          text: qDef.prompt || `Please provide ${qDef.field} for "${nodeLabel}"`,
+          type: mapQuestionType(qDef.type),
+          nodeId,
+          nodeType,
+          nodeLabel,
+          fieldName: qDef.field,
+          category: 'configuration',
+          required: unifiedRequired || qDef.required,
+          options: validOptions,
+          askOrder: qDef.askOrder >= 2 ? qDef.askOrder : 3, // Configuration fields come after operations
+          example: qDef.example,
+          placeholder: qDef.placeholder,
+          description: qDef.description,
+          ...(registryFillModeDefault ? { fillModeDefault: registryFillModeDefault } : {}),
+        };
+
+        questions.push(question);
+        console.log(`[ComprehensiveQuestions] Added configuration question for ${nodeType}.${qDef.field} (required: ${qDef.required}, askOrder: ${qDef.askOrder})`);
+      }
+    }
+  } else {
+    // Fallback: Generate questions from schema
+    const requiredFields = schema.configSchema.required || [];
+    const optionalFieldNames = Object.keys(schema.configSchema.optional || {});
+    const fieldsToProcess = includeFilledFields
+      ? Array.from(new Set([...requiredFields, ...optionalFieldNames]))
+      : requiredFields;
+    
+    const unifiedForConfig = unifiedNodeRegistry.get(nodeType);
+    const fieldPolicyForConfig = unifiedForConfig
+      ? resolveFieldPolicyForNode(unifiedForConfig, config as Record<string, unknown>)
+      : null;
+    for (const fieldName of fieldsToProcess) {
+      // Skip credential and operation fields (already handled)
+      const fieldLower = fieldName.toLowerCase();
+      if (fieldLower.includes('credential') || 
+          fieldLower.includes('operation') ||
+          fieldLower.includes('apikey') ||
+          fieldLower.includes('token')) {
+        continue;
+      }
+      const cfgFd = unifiedForConfig?.inputSchema?.[fieldName];
+      if (fieldPolicyForConfig?.fields[fieldName]?.active === false) {
+        continue;
+      }
+      if (cfgFd && isCredentialOwnership(fieldName, cfgFd)) {
+        continue;
+      }
+      if (cfgFd && shouldHidePassiveStructuralField(unifiedForConfig?.category, fieldName, cfgFd, config as Record<string, any>)) {
+        continue;
+      }
+      if (cfgFd && unifiedForConfig?.inputSchema) {
+        const mode = resolveEffectiveFieldFillMode(fieldName, unifiedForConfig.inputSchema, config as Record<string, any>);
+        const hasExplicitFillMode = config._fillMode?.[fieldName] !== undefined;
+        if (mode === 'runtime_ai' && !hasExplicitFillMode && !isEmptyValue(config[fieldName])) {
+          continue;
+        }
+      }
+
+      const fieldValue = config[fieldName];
+      // ✅ FIX: Use universal isEmpty check
+      if (includeFilledFields || isEmptyValue(fieldValue)) {
+        const fieldInfo = schema.configSchema.optional?.[fieldName];
+        
+        // ✅ ENHANCED: Generate context-aware question text based on field name and node type
+        let questionText = `Please provide ${fieldName} for "${nodeLabel}"`;
+        const fieldLower = fieldName.toLowerCase();
+        
+        // Field-specific question text
+        if (fieldLower === 'path' || fieldLower === 'url') {
+          questionText = `What is the ${fieldName} for "${nodeLabel}"?`;
+        } else if (fieldLower === 'cron') {
+          questionText = `What is the schedule (cron expression) for "${nodeLabel}"?`;
+        } else if (fieldLower === 'formtitle' || fieldLower === 'form_title') {
+          questionText = `What is the form title for "${nodeLabel}"?`;
+        } else if (fieldLower === 'fields') {
+          questionText = `What fields should "${nodeLabel}" have?`;
+        } else if (fieldLower === 'message' || fieldLower === 'text' || fieldLower === 'body') {
+          questionText = `What ${fieldName} should "${nodeLabel}" send?`;
+        } else if (fieldLower === 'to' || fieldLower === 'email') {
+          questionText = `What is the recipient email for "${nodeLabel}"?`;
+        } else if (fieldLower === 'subject') {
+          questionText = `What is the email subject for "${nodeLabel}"?`;
+        } else if (fieldLower === 'channel' || fieldLower === 'channelid') {
+          questionText = `What is the ${getProviderName(nodeType)} channel for "${nodeLabel}"?`;
+        } else if (fieldLower === 'chatid') {
+          questionText = `What is the Telegram chat ID for "${nodeLabel}"?`;
+        } else if (fieldLower === 'conditions') {
+          questionText = `What conditions should "${nodeLabel}" check?`;
+        } else if (fieldLower === 'code' || fieldLower === 'javascript') {
+          questionText = `What code should "${nodeLabel}" execute?`;
+        } else if (fieldLower.includes('id') && !fieldLower.includes('credential')) {
+          questionText = `What is the ${fieldName} for "${nodeLabel}"?`;
+        } else if (fieldLower.includes('properties') || fieldLower.includes('data')) {
+          questionText = `What ${fieldName} should "${nodeLabel}" use?`;
+        }
+
+        // Decide input type and options
+        let type = determineInputType(fieldName, fieldInfo);
+        let options: Array<{ label: string; value: string }> | undefined;
+
+        // ✅ WORLD-CLASS: Only use explicit options for select fields, NOT examples
+        // Examples are just hints for users, not selectable dropdown options
+        if (type === 'select') {
+          if (Array.isArray(fieldInfo?.options) && fieldInfo.options.length > 0) {
+            options = fieldInfo.options.map((opt: any) =>
+              typeof opt === 'string'
+                ? { label: opt, value: opt }
+                : { label: opt.label || opt.value, value: opt.value }
+            );
+          } else {
+            // ✅ If no explicit options, change to text input (not select)
+            // Don't use examples as dropdown options
+            type = 'text';
+            console.log(`[ComprehensiveQuestions] ⚠️  Field ${fieldName} marked as select but has no explicit options - changing to text input`);
+          }
+
+          // ✅ REMOVED: Don't use examples as options
+          // Examples are just hints, not selectable dropdown options
+          // Previously: examples were used as fallback options - this is WRONG
+          // Now: Only explicit options create dropdowns, otherwise use text input
+
+          // If we ended up with no options, fall back to text input
+          if (!options || options.length === 0) {
+            type = 'text';
+            options = undefined;
+          }
+        }
+        
+        const cfgFieldDef = unifiedForConfig?.inputSchema?.[fieldName] as any;
+        const cfgFillModeDefault = cfgFieldDef?.fillMode?.default as
+          | 'manual_static'
+          | 'runtime_ai'
+          | 'buildtime_ai_once'
+          | undefined;
+        const question: ComprehensiveNodeQuestion = {
+          id: `config_${nodeId}_${fieldName}`,
+          text: questionText,
+          type,
+          nodeId,
+          nodeType,
+          nodeLabel,
+          fieldName,
+          category: 'configuration',
+          required: computeFieldRequiredBeforeExecution(
+            nodeType,
+            fieldName,
+            cfgFieldDef,
+            config as Record<string, unknown>
+          ),
+          askOrder: 3, // Configuration fields come after operations
+          description: fieldInfo?.description,
+          placeholder: fieldInfo?.placeholder || (fieldLower.includes('id') ? `Enter ${fieldName}` : undefined),
+          options,
+          ...(cfgFillModeDefault ? { fillModeDefault: cfgFillModeDefault } : {}),
+        };
+
+        questions.push(question);
+      }
+    }
+  }
+
+  return questions;
+}
+
+/**
+ * Get provider name from node type
+ */
+function getProviderName(nodeType: string): string {
+  // ✅ COMPREHENSIVE: Extract provider name from node type for ALL nodes
+  const providerMap: Record<string, string> = {
+    // Triggers
+    'webhook': 'Webhook',
+    'chat_trigger': 'Chat',
+    'form': 'Form',
+    'schedule': 'Schedule',
+    'manual_trigger': 'Manual',
+    'interval': 'Interval',
+    
+    // HTTP/AI
+    'http_request': 'HTTP Request',
+    'ai_agent': 'AI Agent',
+    'ai_chat_model': 'AI Chat Model',
+    
+    // Logic
+    'if_else': 'If/Else',
+    'switch': 'Switch',
+    'set_variable': 'Set Variable',
+    'function': 'Function',
+    'merge': 'Merge',
+    'wait': 'Wait',
+    'limit': 'Limit',
+    'aggregate': 'Aggregate',
+    'sort': 'Sort',
+    'javascript': 'JavaScript',
+    'code': 'Code',
+    'function_item': 'Function Item',
+    'noop': 'NoOp',
+    
+    // CRM/Productivity
+    'hubspot': 'HubSpot',
+    'zoho_crm': 'Zoho CRM',
+    'zoho': 'Zoho CRM',
+    'salesforce': 'Salesforce',
+    'pipedrive': 'Pipedrive',
+    'notion': 'Notion',
+    'airtable': 'Airtable',
+    'clickup': 'ClickUp',
+    'click_up': 'ClickUp',
+    
+    // Communication
+    'google_gmail': 'Gmail',
+    'gmail': 'Gmail',
+    'slack_message': 'Slack',
+    'slack': 'Slack',
+    'telegram': 'Telegram',
+    'outlook': 'Outlook',
+    'google_calendar': 'Google Calendar',
+    'calendar': 'Calendar',
+    'email': 'Email',
+    
+    // Social
+    'linkedin': 'LinkedIn',
+    'github': 'GitHub',
+    'whatsapp_cloud': 'WhatsApp',
+    'whatsapp': 'WhatsApp',
+    'instagram': 'Instagram',
+    'facebook': 'Facebook',
+    'twitter': 'Twitter',
+    'youtube': 'YouTube',
+    
+    // Google Services
+    'google_sheets': 'Google Sheets',
+    'google_doc': 'Google Docs',
+    'google_docs': 'Google Docs',
+    'google_drive': 'Google Drive',
+    'google_contacts': 'Google Contacts',
+    'google_tasks': 'Google Tasks',
+    'google_bigquery': 'BigQuery',
+    
+    // Other
+    'discord': 'Discord',
+    'twilio': 'Twilio',
+    'stripe': 'Stripe',
+    'shopify': 'Shopify',
+  };
+
+  const normalized = nodeType.toLowerCase().replace(/_/g, '');
+  for (const [key, value] of Object.entries(providerMap)) {
+    const keyNormalized = key.toLowerCase().replace(/_/g, '');
+    if (normalized.includes(keyNormalized) || normalized === keyNormalized) {
+      return value;
+    }
+  }
+
+  // Default: capitalize first letter and replace underscores with spaces
+  return nodeType
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+/**
+ * Map question type from node-question-order to comprehensive format
+ */
+function mapQuestionType(type: string): string {
+  const typeMap: Record<string, string> = {
+    'string': 'text',
+    'number': 'number',
+    'boolean': 'select',
+    'select': 'select',
+    'email': 'text',
+    'json': 'textarea',
+    'code': 'textarea',
+    'datetime': 'text',
+    'credential': 'credential',
+  };
+
+  return typeMap[type] || 'text';
+}
+
+/**
+ * Determine input type from field name and info
+ * ✅ WORLD-CLASS: Only use explicit options for dropdowns, not examples
+ * URLs, API keys, spreadsheet IDs, etc. should ALWAYS be text inputs
+ */
+export function determineInputType(fieldName: string, fieldInfo?: any): string {
+  // If schema explicitly marks this as array/object, use JSON editor rather than select
+  // (e.g. loop.items, fields configs, generic data payloads)
+  if (fieldInfo?.type === 'array' || fieldInfo?.type === 'object') {
+    return 'json';
+  }
+
+  const fieldLower = fieldName.toLowerCase();
+
+  if (isFieldUserProvidedText(fieldName)) {
+    return 'text';
+  }
+
+  // ✅ Any schema-defined enumeration (`options` in node library) → select (e.g. Gmail recipientSource)
+  if (shouldUseSelectForExplicitOptions(fieldName, fieldInfo)) {
+    return 'select';
+  }
+
+  // Default to text for everything else
+  if (fieldLower.includes('email')) {
+    return 'text';
+  }
+  if (fieldLower.includes('message') || fieldLower.includes('text') || fieldLower.includes('body') || fieldLower.includes('content')) {
+    return 'textarea';
+  }
+  if (fieldLower.includes('properties') || fieldLower.includes('data') || fieldLower.includes('json')) {
+    return 'json'; // JSON input with proper formatting
+  }
+
+  return 'text';
+}
+
+/**
+ * Format JSON field value properly
+ * Ensures JSON fields are properly formatted and arranged
+ */
+export function formatJsonFieldValue(value: any, fieldName: string): any {
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  // If it's already a properly formatted object/array, return as-is
+  if (typeof value === 'object' && !Array.isArray(value) && value !== null) {
+    // Ensure proper JSON structure
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  // If it's a string, try to parse as JSON
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      // Re-stringify to ensure proper formatting
+      return parsed;
+    } catch (e) {
+      // If not valid JSON, return as string
+      return value;
+    }
+  }
+
+  return value;
+}

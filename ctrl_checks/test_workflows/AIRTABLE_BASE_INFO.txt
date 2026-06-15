@@ -1,0 +1,35 @@
+===========================================
+AIRTABLE BASE INFORMATION
+Save this for reference!
+===========================================
+
+Base Name: Testbase
+Base ID: appr2FSFmDcmV1qzO
+Base URL: https://airtable.com/appr2FSFmDcmV1qzO
+
+Table Name: Table 1
+Fields: Segment, Country
+
+API Key: AIRTABLE_PAT_REPLACE_ME
+
+===========================================
+WORKFLOW CONFIG EXAMPLE
+===========================================
+
+{
+  "apiKey": "AIRTABLE_PAT_REPLACE_ME",
+  "baseId": "appr2FSFmDcmV1qzO",
+  "table": "Table 1",
+  "resource": "Record",
+  "operation": "list"
+}
+
+===========================================
+QUICK ACCESS
+===========================================
+
+Airtable Home: https://airtable.com
+Create Tokens: https://airtable.com/create/tokens
+Your Base: https://airtable.com/appr2FSFmDcmV1qzO
+
+===========================================

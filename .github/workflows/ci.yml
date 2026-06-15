@@ -148,6 +148,10 @@ jobs:
           VITE_USE_DIRECT_BACKEND:    'false'
         run: npm run build
 
+      - name: Bundle size gate
+        working-directory: ./ctrl_checks
+        run: node scripts/check-bundle-size.mjs
+
       - name: Upload dist artifact
         uses: actions/upload-artifact@v4
         with:

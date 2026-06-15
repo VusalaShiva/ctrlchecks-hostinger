@@ -1,0 +1,91 @@
+/**
+ * Frontend mirror of AI editor contracts (narrow subset for the workbench UI).
+ * Structural edits are expressed as node-centric operations; edges are never sent from the client.
+ */
+
+export type AiEditorChatMode = 'analyze' | 'suggest';
+
+export interface AiEditorMutationOperationBase {
+  kind: string;
+}
+
+export interface AddNodeOperation extends AiEditorMutationOperationBase {
+  kind: 'add_node';
+  nodeType: string;
+  label?: string;
+  configOverrides?: Record<string, unknown>;
+  positionHint?: {
+    relation: 'before' | 'after' | 'replace';
+    referenceNodeId: string;
+  };
+}
+
+export interface RemoveNodeOperation extends AiEditorMutationOperationBase {
+  kind: 'remove_node';
+  nodeId: string;
+}
+
+export interface ReplaceNodeOperation extends AiEditorMutationOperationBase {
+  kind: 'replace_node';
+  targetNodeId: string;
+  newNodeType: string;
+  configStrategy?: 'preserve_compatible' | 'use_defaults' | 'merge';
+  configOverrides?: Record<string, unknown>;
+}
+
+export interface UpdateNodeConfigOperation extends AiEditorMutationOperationBase {
+  kind: 'update_node_config';
+  nodeId: string;
+  path: string;
+  newValue: unknown;
+}
+
+export interface InsertSafetyNodeOperation extends AiEditorMutationOperationBase {
+  kind: 'insert_safety_node';
+  nodeType: string;
+  position: {
+    relation: 'before' | 'after';
+    referenceNodeId: string;
+  };
+  configOverrides?: Record<string, unknown>;
+}
+
+export interface RefactorLinearizeOperation extends AiEditorMutationOperationBase {
+  kind: 'refactor_linearize';
+  focusNodeIds?: string[];
+}
+
+export type AiEditorMutationOperation =
+  | AddNodeOperation
+  | RemoveNodeOperation
+  | ReplaceNodeOperation
+  | UpdateNodeConfigOperation
+  | InsertSafetyNodeOperation
+  | RefactorLinearizeOperation;
+
+export interface WorkflowDiffNodeEntry {
+  nodeId: string;
+  before?: { data?: { label?: string; type?: string } };
+  after?: { data?: { label?: string; type?: string } };
+}
+
+export interface WorkflowDiffEdgeEntry {
+  edgeId: string;
+  before?: unknown;
+  after?: unknown;
+}
+
+export interface WorkflowDiffSummary {
+  nodes?: WorkflowDiffNodeEntry[];
+  edges?: WorkflowDiffEdgeEntry[];
+}
+
+export interface AiEditorCapabilitiesResponse {
+  success: boolean;
+  role: 'admin' | 'moderator' | 'user';
+  capabilities: string[];
+  lifecyclePhase?: 'draft' | 'active';
+  canApply?: boolean;
+  applyBlockedReason?: string;
+  error?: string;
+}

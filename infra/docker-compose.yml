@@ -1,0 +1,134 @@
+version: "3.8"
+
+services:
+  nginx:
+    image: nginx:1.25-alpine
+    depends_on:
+      - app1
+      - app2
+      - app3
+    ports:
+      - "8088:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+
+  pgbouncer:
+    image: bitnami/pgbouncer:1.22.1
+    environment:
+      POSTGRESQL_HOST: ctrlchecks-db.cxm8gymyysvy.ap-south-1.rds.amazonaws.com
+      POSTGRESQL_PORT: 5432
+      POSTGRESQL_DATABASE: ctrlchecks
+      POSTGRESQL_USERNAME: ctrlchecks_admin
+      POSTGRESQL_PASSWORD: ${DB_PASSWORD}
+      PGBOUNCER_PORT: 6432
+      PGBOUNCER_POOL_MODE: transaction
+      PGBOUNCER_MAX_CLIENT_CONN: 500
+      PGBOUNCER_DEFAULT_POOL_SIZE: 20
+      PGBOUNCER_RESERVE_POOL_SIZE: 10
+      PGBOUNCER_SERVER_IDLE_TIMEOUT: 600
+      PGBOUNCER_AUTH_TYPE: md5
+    ports:
+      - "6432:6432"
+    healthcheck:
+      test: ["CMD-SHELL", "psql -h 127.0.0.1 -p 6432 -U ctrlchecks_admin -d ctrlchecks -c 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app1: &app
+    build:
+      context: ../worker
+    command: npm run start
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      REDIS_URL: redis://redis:6379
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_REQUEST_TOPIC: request-queue
+      KAFKA_DEAD_LETTER_TOPIC: request-queue-dlq
+      QUEUE_WRITES_ENABLED: "true"
+      RATE_LIMIT_PER_MINUTE: 100
+      GET_CACHE_TTL_SECONDS: 60
+      ENABLE_EXECUTION_QUEUE: "true"
+      WORKFLOW_WORKER_CONCURRENCY: "5"
+      WEBSOCKET_REDIS_CHANNEL_PREFIX: "ws:exec:"
+      DATABASE_URL: postgresql://ctrlchecks_admin:${DB_PASSWORD}@pgbouncer:6432/ctrlchecks
+      DIRECT_DATABASE_URL: postgresql://ctrlchecks_admin:${DB_PASSWORD}@ctrlchecks-db.cxm8gymyysvy.ap-south-1.rds.amazonaws.com:5432/ctrlchecks
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      pgbouncer:
+        condition: service_healthy
+    expose:
+      - "3001"
+
+  app2:
+    <<: *app
+
+  app3:
+    <<: *app
+
+  request-worker:
+    <<: *app
+    command: npm run start:kafka-worker
+    deploy:
+      replicas: 3
+
+  execution-worker:
+    <<: *app
+    command: npm run start:execution-worker
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      REDIS_URL: redis://redis:6379
+      KAFKA_BROKERS: kafka:9092
+      ENABLE_EXECUTION_QUEUE: "true"
+      WORKFLOW_WORKER_CONCURRENCY: "5"
+      WEBSOCKET_REDIS_CHANNEL_PREFIX: "ws:exec:"
+      DATABASE_URL: postgresql://ctrlchecks_admin:${DB_PASSWORD}@pgbouncer:6432/ctrlchecks
+      DIRECT_DATABASE_URL: postgresql://ctrlchecks_admin:${DB_PASSWORD}@ctrlchecks-db.cxm8gymyysvy.ap-south-1.rds.amazonaws.com:5432/ctrlchecks
+    deploy:
+      replicas: 2
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+
+volumes:
+  redis_data:
+  kafka_data:

@@ -1,0 +1,174 @@
+# ── Dependencies ──────────────────────────────────────────────────────────────
+node_modules/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# ── Environment / Secrets (NEVER commit) ──────────────────────────────────────
+.env
+.env.*
+!.env.example
+!.env.production.example
+!.env.test.example
+worker/.env
+ctrl_checks/.env
+ctrl_checks/.env.local
+ctrl_checks/.env.production
+services/**/.env
+
+# ── AWS / Keys / Certificates ─────────────────────────────────────────────────
+*.pem
+*.key
+*.p12
+*.pfx
+.aws/
+RDS/
+worker-key.pem
+worker.git.corrupt-backup/
+
+# ── Build outputs ─────────────────────────────────────────────────────────────
+dist/
+build/
+*.egg-info/
+.next/
+out/
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Testing / Coverage ────────────────────────────────────────────────────────
+coverage/
+.nyc_output/
+.pytest_cache/
+.coverage
+
+# ── Temporary / Cache ─────────────────────────────────────────────────────────
+*.tmp
+*.temp
+.cache/
+*.bak
+*.backup
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Database ──────────────────────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+.dockerignore
+
+# ── Large media / binaries ────────────────────────────────────────────────────
+*.mp4
+*.mov
+*.avi
+*.zip
+*.tar.gz
+*.tgz
+
+# ── Root-level legacy analysis/noise docs (keep docs/, .claude/logs/ instead) ─
+# Patterns matching the 100+ ad-hoc planning MDs dumped at repo root:
+/AI_*.md
+/ARCHITECTURE*.md
+/AWS_*.md
+/CAPABILITY_*.md
+/CENTRAL_*.md
+/CLEANUP_*.md
+/CLEAN_*.md
+/CODEBASE_*.md
+/COMPLETE_*.md
+/COMPLEX_*.md
+/CORE_ARCHITECTURE_*.md
+/CREDENTIAL_*.md
+/CTRLCHECKS_*.md
+/CURSOR_*.md
+/DATA_FLOW_*.md
+/DEBUG_*.md
+/DELL_*.md
+/DETERMINISTIC_*.md
+/DSL_*.md
+/ENTERPRISE_*.md
+/ERROR_*.md
+/FIELD_MAPPING_*.md
+/FINAL_*.md
+/FIXES_*.md
+/FRONTEND_*.md
+/GEMINI_*.md
+/GOOGLE_*.md
+/GUARANTEED_*.md
+/IF_ELSE_*.md
+/IMPLEMENTATION_*.md
+/IMPROVED_*.md
+/INTENT_*.md
+/KEYWORD_*.md
+/LAPTOP_*.md
+/LIGHTRICKS_*.md
+/MENTOR_*.md
+/NETWORK_*.md
+/OLLAMA_*.md
+/PATTERN_*.md
+/PERFORMANCE_*.md
+/PHASE_*.md
+/PIPELINE_*.md
+/PRODUCTION_*.md
+/PROMPT_*.md
+/RAZORPAY_*.md
+/RECENT_*.md
+/REGISTRY_*.md
+/ROUTING_*.md
+/RUNTIME_*.md
+/SECURITY_*.md
+/SESSION_*.md
+/SIMPLE_*.md
+/STAGE_*.md
+/SUMMARY_*.md
+/TASK_*.md
+/TELEGRAM_*.md
+/TEMPLATE_*.md
+/TEST_*.md
+/TRIGGER_*.md
+/TROUBLESHOOT_*.md
+/UI_*.md
+/UNIFIED_*.md
+/UPGRADE_*.md
+/VALIDATION_*.md
+/VARIATION_*.md
+/WEBHOOK_*.md
+/WORKFLOW_*.md
+/YOUTUBE_*.md
+/ZOOM_*.md
+# Keep these root MDs:
+!README.md
+!CLAUDE.md
+!NODE_ADDITION_CHECKLIST.md
+!ADDING_NEW_NODES_GUIDE.md
+
+# ── Misc root junk ────────────────────────────────────────────────────────────
+/N/
+/Untitled*
+*.pdf
+*.docx
+*.pptx
+"Ctrl Checks AI Presentation Deck.pdf"
+/Guide/Worker/ctrlchecks-backend.pem
+
+# ── Claude logs are NOT in standard logs/ — allow .claude/logs/ ───────────────
+!.claude/
+!.claude/logs/

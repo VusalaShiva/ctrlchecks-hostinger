@@ -1,0 +1,3756 @@
+[
+  {
+    "type": "schedule",
+    "category": "triggers",
+    "inputs": [],
+    "outputs": [
+      "output"
+    ],
+    "requiredConfig": [
+      "cron"
+    ],
+    "optionalConfig": [
+      "cron",
+      "timezone"
+    ]
+  },
+  {
+    "type": "webhook",
+    "category": "triggers",
+    "inputs": [],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "path"
+    ],
+    "optionalConfig": [
+      "path",
+      "httpMethod",
+      "responseMode",
+      "verifySignature",
+      "secretToken"
+    ]
+  },
+  {
+    "type": "manual_trigger",
+    "category": "triggers",
+    "inputs": [],
+    "outputs": [
+      "inputData",
+      "output"
+    ],
+    "requiredConfig": [],
+    "optionalConfig": [
+      "inputData"
+    ]
+  },
+  {
+    "type": "interval",
+    "category": "triggers",
+    "inputs": [],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "interval",
+      "unit"
+    ],
+    "optionalConfig": [
+      "interval",
+      "unit"
+    ]
+  },
+  {
+    "type": "chat_trigger",
+    "category": "triggers",
+    "inputs": [],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [],
+    "optionalConfig": [
+      "channel",
+      "allowedSenders",
+      "message"
+    ]
+  },
+  {
+    "type": "form",
+    "category": "triggers",
+    "inputs": [],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "formTitle",
+      "fields"
+    ],
+    "optionalConfig": [
+      "formTitle",
+      "formDescription",
+      "fields",
+      "submitButtonText",
+      "successMessage",
+      "allowMultipleSubmissions",
+      "requireAuthentication",
+      "captcha"
+    ]
+  },
+  {
+    "type": "http_request",
+    "category": "http_api",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "url"
+    ],
+    "optionalConfig": [
+      "url",
+      "method",
+      "headers",
+      "body",
+      "qs",
+      "timeout",
+      "retryOnFail",
+      "maxRetries"
+    ]
+  },
+  {
+    "type": "respond_to_webhook",
+    "category": "http_api",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [],
+    "optionalConfig": [
+      "responseCode",
+      "headers",
+      "body"
+    ]
+  },
+  {
+    "type": "postgresql",
+    "category": "database",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "query"
+    ],
+    "optionalConfig": [
+      "connectionString",
+      "query",
+      "parameters"
+    ]
+  },
+  {
+    "type": "db",
+    "category": "database",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "table",
+      "operation"
+    ],
+    "optionalConfig": [
+      "table",
+      "operation",
+      "data",
+      "filters"
+    ]
+  },
+  {
+    "type": "database_read",
+    "category": "database",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "query"
+    ],
+    "optionalConfig": [
+      "connectionString",
+      "query",
+      "parameters"
+    ]
+  },
+  {
+    "type": "database_write",
+    "category": "database",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "query"
+    ],
+    "optionalConfig": [
+      "connectionString",
+      "query",
+      "parameters"
+    ]
+  },
+  {
+    "type": "google_sheets",
+    "category": "google",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "spreadsheetId",
+      "operation"
+    ],
+    "optionalConfig": [
+      "operation",
+      "spreadsheetId",
+      "sheetName",
+      "range",
+      "outputFormat",
+      "values",
+      "data"
+    ]
+  },
+  {
+    "type": "google_doc",
+    "category": "google",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation"
+    ],
+    "optionalConfig": [
+      "operation",
+      "documentId",
+      "documentUrl",
+      "title",
+      "content",
+      "format"
+    ]
+  },
+  {
+    "type": "google_gmail",
+    "category": "google",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [],
+    "optionalConfig": [
+      "credentialId",
+      "operation",
+      "recipientSource",
+      "recipientEmails",
+      "spreadsheetId",
+      "sheetName",
+      "range",
+      "useAiRecipientMapping",
+      "subject",
+      "body",
+      "from",
+      "messageId",
+      "query",
+      "maxResults"
+    ]
+  },
+  {
+    "type": "outlook",
+    "category": "microsoft",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [],
+    "optionalConfig": [
+      "operation",
+      "to",
+      "subject",
+      "body",
+      "from",
+      "accessToken",
+      "credentialId",
+      "messageId",
+      "query",
+      "maxResults"
+    ]
+  },
+  {
+    "type": "salesforce",
+    "category": "crm",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "resource",
+      "operation"
+    ],
+    "optionalConfig": [
+      "instanceUrl",
+      "accessToken",
+      "resource",
+      "customObject",
+      "operation",
+      "soql",
+      "sosl",
+      "id",
+      "externalIdField",
+      "externalIdValue",
+      "fields",
+      "records"
+    ]
+  },
+  {
+    "type": "microsoft_dynamics",
+    "category": "crm",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "resource",
+      "operation"
+    ],
+    "optionalConfig": [
+      "instanceUrl",
+      "accessToken",
+      "resource",
+      "customEntity",
+      "operation",
+      "id",
+      "fields",
+      "fetchXml",
+      "select",
+      "filter",
+      "top"
+    ]
+  },
+  {
+    "type": "sap",
+    "category": "crm",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation",
+      "endpoint"
+    ],
+    "optionalConfig": [
+      "baseUrl",
+      "operation",
+      "endpoint",
+      "payload",
+      "queryParams",
+      "accessToken",
+      "username",
+      "password",
+      "csrfToken",
+      "format"
+    ]
+  },
+  {
+    "type": "clickup",
+    "category": "actions",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation"
+    ],
+    "optionalConfig": [
+      "operation",
+      "workspaceId",
+      "spaceId",
+      "listId",
+      "taskId",
+      "taskName",
+      "taskDescription",
+      "status",
+      "priority",
+      "commentText"
+    ]
+  },
+  {
+    "type": "set_variable",
+    "category": "data",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "name"
+    ],
+    "optionalConfig": [
+      "name",
+      "value",
+      "values",
+      "keepSource"
+    ]
+  },
+  {
+    "type": "javascript",
+    "category": "data",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "code"
+    ],
+    "optionalConfig": [
+      "code"
+    ]
+  },
+  {
+    "type": "function",
+    "category": "logic",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "description"
+    ],
+    "optionalConfig": [
+      "description",
+      "code",
+      "timeout"
+    ]
+  },
+  {
+    "type": "function_item",
+    "category": "logic",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "description"
+    ],
+    "optionalConfig": [
+      "description",
+      "items"
+    ]
+  },
+  {
+    "type": "date_time",
+    "category": "data",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation"
+    ],
+    "optionalConfig": [
+      "operation",
+      "dateValue",
+      "format"
+    ]
+  },
+  {
+    "type": "text_formatter",
+    "category": "data",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "template"
+    ],
+    "optionalConfig": [
+      "template",
+      "values"
+    ]
+  },
+  {
+    "type": "if_else",
+    "category": "logic",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "conditions"
+    ],
+    "optionalConfig": [
+      "conditions",
+      "combineOperation"
+    ]
+  },
+  {
+    "type": "switch",
+    "category": "logic",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "expression",
+      "cases"
+    ],
+    "optionalConfig": [
+      "expression",
+      "cases",
+      "routingType",
+      "rules"
+    ]
+  },
+  {
+    "type": "merge",
+    "category": "logic",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "mode"
+    ],
+    "optionalConfig": [
+      "mode",
+      "joinBy"
+    ]
+  },
+  {
+    "type": "error_handler",
+    "category": "logic",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [],
+    "optionalConfig": [
+      "continueOnFail",
+      "retryOnFail",
+      "maxRetries",
+      "retryDelay"
+    ]
+  },
+  {
+    "type": "wait",
+    "category": "logic",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "duration"
+    ],
+    "optionalConfig": [
+      "duration",
+      "unit"
+    ]
+  },
+  {
+    "type": "delay",
+    "category": "utility",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "duration"
+    ],
+    "optionalConfig": [
+      "duration",
+      "unit"
+    ]
+  },
+  {
+    "type": "timeout",
+    "category": "flow",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "limit"
+    ],
+    "optionalConfig": [
+      "limit"
+    ]
+  },
+  {
+    "type": "return",
+    "category": "flow",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [],
+    "optionalConfig": [
+      "value",
+      "includeInput"
+    ]
+  },
+  {
+    "type": "execute_workflow",
+    "category": "workflow",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "workflowId"
+    ],
+    "optionalConfig": [
+      "workflowId",
+      "input",
+      "waitForCompletion"
+    ]
+  },
+  {
+    "type": "try_catch",
+    "category": "flow",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [],
+    "optionalConfig": []
+  },
+  {
+    "type": "retry",
+    "category": "flow",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "maxAttempts"
+    ],
+    "optionalConfig": [
+      "maxAttempts",
+      "delayBetween",
+      "backoff"
+    ]
+  },
+  {
+    "type": "parallel",
+    "category": "flow",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [],
+    "optionalConfig": [
+      "mode"
+    ]
+  },
+  {
+    "type": "queue_push",
+    "category": "queue",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "queueName",
+      "message"
+    ],
+    "optionalConfig": [
+      "queueName",
+      "message",
+      "options"
+    ]
+  },
+  {
+    "type": "queue_consume",
+    "category": "queue",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "queueName"
+    ],
+    "optionalConfig": [
+      "queueName",
+      "timeout",
+      "autoAck"
+    ]
+  },
+  {
+    "type": "cache_get",
+    "category": "cache",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "key"
+    ],
+    "optionalConfig": [
+      "key",
+      "defaultValue"
+    ]
+  },
+  {
+    "type": "cache_set",
+    "category": "cache",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "key",
+      "value"
+    ],
+    "optionalConfig": [
+      "key",
+      "value",
+      "ttl"
+    ]
+  },
+  {
+    "type": "oauth2_auth",
+    "category": "auth",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "provider"
+    ],
+    "optionalConfig": [
+      "provider",
+      "authUrl",
+      "tokenUrl",
+      "clientId",
+      "clientSecret",
+      "scope",
+      "action"
+    ]
+  },
+  {
+    "type": "api_key_auth",
+    "category": "auth",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "apiKeyName"
+    ],
+    "optionalConfig": [
+      "apiKeyName"
+    ]
+  },
+  {
+    "type": "ai_agent",
+    "category": "ai",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [],
+    "optionalConfig": [
+      "userInput",
+      "model",
+      "memory",
+      "tool"
+    ]
+  },
+  {
+    "type": "ai_chat_model",
+    "category": "ai",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "prompt"
+    ],
+    "optionalConfig": [
+      "temperature",
+      "prompt",
+      "systemPrompt",
+      "responseFormat"
+    ]
+  },
+  {
+    "type": "slack_message",
+    "category": "output",
+    "inputs": [
+      "text",
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "webhookUrl"
+    ],
+    "optionalConfig": [
+      "webhookUrl",
+      "channel",
+      "message",
+      "blocks",
+      "text",
+      "username",
+      "iconEmoji"
+    ]
+  },
+  {
+    "type": "email",
+    "category": "output",
+    "inputs": [
+      "text",
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "to",
+      "subject",
+      "text"
+    ],
+    "optionalConfig": [
+      "to",
+      "subject",
+      "text",
+      "html"
+    ]
+  },
+  {
+    "type": "log_output",
+    "category": "output",
+    "inputs": [
+      "text",
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [],
+    "optionalConfig": [
+      "level",
+      "message"
+    ]
+  },
+  {
+    "type": "telegram",
+    "category": "output",
+    "inputs": [
+      "text",
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "chatId",
+      "messageType"
+    ],
+    "optionalConfig": [
+      "botToken",
+      "credentialId",
+      "chatId",
+      "messageType",
+      "message",
+      "parseMode",
+      "disableWebPagePreview",
+      "mediaUrl",
+      "caption",
+      "replyToMessageId",
+      "replyMarkup",
+      "disableNotification",
+      "protectContent",
+      "allowSendingWithoutReply"
+    ]
+  },
+  {
+    "type": "linkedin",
+    "category": "social",
+    "inputs": [
+      "text",
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [],
+    "optionalConfig": [
+      "operation",
+      "text",
+      "mediaUrl",
+      "visibility",
+      "personUrn",
+      "dryRun",
+      "richText",
+      "media"
+    ]
+  },
+  {
+    "type": "twitter",
+    "category": "social",
+    "inputs": [
+      "text",
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "resource",
+      "operation"
+    ],
+    "optionalConfig": [
+      "resource",
+      "operation",
+      "text",
+      "tweetId",
+      "query",
+      "accessToken",
+      "credentialId"
+    ]
+  },
+  {
+    "type": "instagram",
+    "category": "social",
+    "inputs": [
+      "text",
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "resource",
+      "operation"
+    ],
+    "optionalConfig": [
+      "resource",
+      "operation",
+      "media_url",
+      "caption",
+      "accessToken",
+      "credentialId"
+    ]
+  },
+  {
+    "type": "youtube",
+    "category": "social",
+    "inputs": [
+      "text",
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation"
+    ],
+    "optionalConfig": [
+      "operation",
+      "title",
+      "description",
+      "tags",
+      "videoUrl",
+      "videoDataBase64",
+      "mimeType",
+      "privacyStatus",
+      "madeForKids",
+      "categoryId",
+      "videoId",
+      "query",
+      "maxResults",
+      "channelId"
+    ]
+  },
+  {
+    "type": "hubspot",
+    "category": "crm",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "resource",
+      "operation"
+    ],
+    "optionalConfig": [
+      "resource",
+      "operation",
+      "apiKey",
+      "accessToken",
+      "credentialId",
+      "id",
+      "objectId",
+      "properties",
+      "searchQuery",
+      "limit",
+      "after"
+    ]
+  },
+  {
+    "type": "airtable",
+    "category": "database",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "baseId",
+      "tableId",
+      "operation"
+    ],
+    "optionalConfig": [
+      "apiKey",
+      "accessToken",
+      "credentialId",
+      "baseId",
+      "tableId",
+      "operation",
+      "recordId",
+      "fields"
+    ]
+  },
+  {
+    "type": "notion",
+    "category": "productivity",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "resource",
+      "operation"
+    ],
+    "optionalConfig": [
+      "apiKey",
+      "accessToken",
+      "credentialId",
+      "resource",
+      "operation",
+      "pageId",
+      "databaseId",
+      "parentPageId",
+      "title",
+      "content",
+      "properties",
+      "filter"
+    ]
+  },
+  {
+    "type": "zoho_crm",
+    "category": "crm",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "resource",
+      "operation"
+    ],
+    "optionalConfig": [
+      "accessToken",
+      "refreshToken",
+      "credentialId",
+      "resource",
+      "operation",
+      "recordId",
+      "criteria",
+      "data"
+    ]
+  },
+  {
+    "type": "pipedrive",
+    "category": "crm",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "resource",
+      "operation"
+    ],
+    "optionalConfig": [
+      "apiToken",
+      "credentialId",
+      "resource",
+      "operation",
+      "id",
+      "data"
+    ]
+  },
+  {
+    "type": "intuit_smes",
+    "category": "crm",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation"
+    ],
+    "optionalConfig": [
+      "apiKey",
+      "accessToken",
+      "credentialId",
+      "operation",
+      "customerId",
+      "name",
+      "email",
+      "amount",
+      "data"
+    ]
+  },
+  {
+    "type": "tally",
+    "category": "crm",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation",
+      "endpoint"
+    ],
+    "optionalConfig": [
+      "endpoint",
+      "operation",
+      "payload",
+      "companyName",
+      "ledgerName",
+      "voucherId"
+    ]
+  },
+  {
+    "type": "discord",
+    "category": "output",
+    "inputs": [
+      "text",
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "message"
+    ],
+    "optionalConfig": [
+      "channelId",
+      "message",
+      "botToken",
+      "webhookUrl"
+    ]
+  },
+  {
+    "type": "zoom_video",
+    "category": "communication",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation",
+      "accessToken"
+    ],
+    "optionalConfig": [
+      "operation",
+      "accessToken",
+      "topic",
+      "duration",
+      "startTime",
+      "meetingId"
+    ]
+  },
+  {
+    "type": "json_parser",
+    "category": "data",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "json"
+    ],
+    "optionalConfig": [
+      "json",
+      "extractFields"
+    ]
+  },
+  {
+    "type": "merge_data",
+    "category": "data",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "mode"
+    ],
+    "optionalConfig": [
+      "mode",
+      "joinBy"
+    ]
+  },
+  {
+    "type": "edit_fields",
+    "category": "data",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [],
+    "optionalConfig": [
+      "fields"
+    ]
+  },
+  {
+    "type": "error_trigger",
+    "category": "triggers",
+    "inputs": [],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [],
+    "optionalConfig": []
+  },
+  {
+    "type": "workflow_trigger",
+    "category": "triggers",
+    "inputs": [],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "source_workflow_id"
+    ],
+    "optionalConfig": [
+      "source_workflow_id"
+    ]
+  },
+  {
+    "type": "filter",
+    "category": "logic",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "condition"
+    ],
+    "optionalConfig": [
+      "condition"
+    ]
+  },
+  {
+    "type": "loop",
+    "category": "logic",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "items"
+    ],
+    "optionalConfig": [
+      "items",
+      "maxIterations"
+    ]
+  },
+  {
+    "type": "noop",
+    "category": "logic",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [],
+    "optionalConfig": []
+  },
+  {
+    "type": "set",
+    "category": "data",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "fields"
+    ],
+    "optionalConfig": [
+      "fields"
+    ]
+  },
+  {
+    "type": "split_in_batches",
+    "category": "logic",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "batchSize"
+    ],
+    "optionalConfig": [
+      "batchSize"
+    ]
+  },
+  {
+    "type": "stop_and_error",
+    "category": "logic",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "errorMessage"
+    ],
+    "optionalConfig": [
+      "errorMessage"
+    ]
+  },
+  {
+    "type": "math",
+    "category": "data",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation"
+    ],
+    "optionalConfig": [
+      "operation",
+      "a",
+      "b"
+    ]
+  },
+  {
+    "type": "html",
+    "category": "data",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "html"
+    ],
+    "optionalConfig": [
+      "html",
+      "operation"
+    ]
+  },
+  {
+    "type": "xml",
+    "category": "data",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "xml"
+    ],
+    "optionalConfig": [
+      "xml",
+      "operation"
+    ]
+  },
+  {
+    "type": "csv",
+    "category": "data",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation"
+    ],
+    "optionalConfig": [
+      "operation",
+      "csv",
+      "data"
+    ]
+  },
+  {
+    "type": "rename_keys",
+    "category": "data",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "mappings"
+    ],
+    "optionalConfig": [
+      "mappings"
+    ]
+  },
+  {
+    "type": "aggregate",
+    "category": "data",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation"
+    ],
+    "optionalConfig": [
+      "operation",
+      "field",
+      "delimiter",
+      "groupBy"
+    ]
+  },
+  {
+    "type": "sort",
+    "category": "data",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [],
+    "optionalConfig": [
+      "field",
+      "direction",
+      "type"
+    ]
+  },
+  {
+    "type": "limit",
+    "category": "data",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "limit"
+    ],
+    "optionalConfig": [
+      "limit",
+      "array"
+    ]
+  },
+  {
+    "type": "openai_gpt",
+    "category": "ai",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "model",
+      "prompt"
+    ],
+    "optionalConfig": [
+      "model",
+      "prompt"
+    ]
+  },
+  {
+    "type": "anthropic_claude",
+    "category": "ai",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "model",
+      "messages",
+      "apiKey"
+    ],
+    "optionalConfig": [
+      "model",
+      "apiKey",
+      "messages"
+    ]
+  },
+  {
+    "type": "google_gemini",
+    "category": "ai",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "prompt"
+    ],
+    "optionalConfig": [
+      "model",
+      "apiKey",
+      "prompt"
+    ]
+  },
+  {
+    "type": "ollama",
+    "category": "ai",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "prompt"
+    ],
+    "optionalConfig": [
+      "prompt",
+      "temperature"
+    ]
+  },
+  {
+    "type": "text_summarizer",
+    "category": "ai",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "text"
+    ],
+    "optionalConfig": [
+      "text",
+      "maxLength"
+    ]
+  },
+  {
+    "type": "sentiment_analyzer",
+    "category": "ai",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "text"
+    ],
+    "optionalConfig": [
+      "text"
+    ]
+  },
+  {
+    "type": "chat_model",
+    "category": "ai",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [],
+    "optionalConfig": [
+      "temperature"
+    ]
+  },
+  {
+    "type": "memory",
+    "category": "ai",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [],
+    "optionalConfig": [
+      "context"
+    ]
+  },
+  {
+    "type": "tool",
+    "category": "ai",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "toolName"
+    ],
+    "optionalConfig": [
+      "toolName"
+    ]
+  },
+  {
+    "type": "http_post",
+    "category": "http_api",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "url",
+      "body"
+    ],
+    "optionalConfig": [
+      "url",
+      "body",
+      "headers"
+    ]
+  },
+  {
+    "type": "webhook_response",
+    "category": "http_api",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "responseCode"
+    ],
+    "optionalConfig": [
+      "responseCode",
+      "body"
+    ]
+  },
+  {
+    "type": "graphql",
+    "category": "http_api",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "url",
+      "query"
+    ],
+    "optionalConfig": [
+      "url",
+      "query",
+      "variables"
+    ]
+  },
+  {
+    "type": "google_drive",
+    "category": "google",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation"
+    ],
+    "optionalConfig": [
+      "operation",
+      "fileId",
+      "fileName"
+    ]
+  },
+  {
+    "type": "google_calendar",
+    "category": "google",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "resource",
+      "operation"
+    ],
+    "optionalConfig": [
+      "credentialId",
+      "resource",
+      "operation",
+      "calendarId",
+      "eventId",
+      "summary",
+      "start",
+      "end",
+      "eventData",
+      "description",
+      "timeMin",
+      "timeMax",
+      "maxResults",
+      "q"
+    ]
+  },
+  {
+    "type": "google_contacts",
+    "category": "google",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation"
+    ],
+    "optionalConfig": [
+      "operation",
+      "contactId"
+    ]
+  },
+  {
+    "type": "google_tasks",
+    "category": "google",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation"
+    ],
+    "optionalConfig": [
+      "operation",
+      "taskId"
+    ]
+  },
+  {
+    "type": "google_bigquery",
+    "category": "google",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "query"
+    ],
+    "optionalConfig": [
+      "query",
+      "projectId"
+    ]
+  },
+  {
+    "type": "slack_webhook",
+    "category": "output",
+    "inputs": [
+      "text",
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "webhookUrl",
+      "message"
+    ],
+    "optionalConfig": [
+      "webhookUrl",
+      "message"
+    ]
+  },
+  {
+    "type": "discord_webhook",
+    "category": "output",
+    "inputs": [
+      "text",
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "webhookUrl",
+      "message"
+    ],
+    "optionalConfig": [
+      "webhookUrl",
+      "message"
+    ]
+  },
+  {
+    "type": "microsoft_teams",
+    "category": "output",
+    "inputs": [
+      "text",
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "webhookUrl",
+      "message"
+    ],
+    "optionalConfig": [
+      "webhookUrl",
+      "message"
+    ]
+  },
+  {
+    "type": "whatsapp_cloud",
+    "category": "output",
+    "inputs": [
+      "text",
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "resource",
+      "operation",
+      "phoneNumberId",
+      "to"
+    ],
+    "optionalConfig": [
+      "resource",
+      "operation",
+      "phoneNumberId",
+      "to",
+      "text",
+      "message",
+      "mediaUrl",
+      "apiKey",
+      "credentialId"
+    ]
+  },
+  {
+    "type": "twilio",
+    "category": "output",
+    "inputs": [
+      "text",
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "to",
+      "message"
+    ],
+    "optionalConfig": [
+      "to",
+      "message",
+      "from",
+      "accountSid",
+      "authToken"
+    ]
+  },
+  {
+    "type": "mailgun",
+    "category": "output",
+    "inputs": [
+      "text",
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "domain",
+      "apiKey",
+      "from",
+      "to"
+    ],
+    "optionalConfig": [
+      "operation",
+      "domain",
+      "apiKey",
+      "from",
+      "to",
+      "subject",
+      "text",
+      "html"
+    ]
+  },
+  {
+    "type": "sendgrid",
+    "category": "output",
+    "inputs": [
+      "text",
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "apiKey",
+      "from",
+      "to"
+    ],
+    "optionalConfig": [
+      "operation",
+      "apiKey",
+      "from",
+      "to",
+      "subject",
+      "text",
+      "html"
+    ]
+  },
+  {
+    "type": "amazon_ses",
+    "category": "output",
+    "inputs": [
+      "text",
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "recipients",
+      "subject",
+      "body"
+    ],
+    "optionalConfig": [
+      "recipients",
+      "subject",
+      "body",
+      "useTemplate",
+      "templateName",
+      "templateData",
+      "fromAddress",
+      "replyToAddresses",
+      "attachments",
+      "awsRegion",
+      "configurationSetName",
+      "tags",
+      "returnPath"
+    ]
+  },
+  {
+    "type": "facebook",
+    "category": "social",
+    "inputs": [
+      "text",
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "message"
+    ],
+    "optionalConfig": [
+      "message",
+      "pageId",
+      "accessToken",
+      "credentialId"
+    ]
+  },
+  {
+    "type": "whatsapp",
+    "category": "communication",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "resource",
+      "operation"
+    ],
+    "optionalConfig": [
+      "resource",
+      "operation",
+      "phoneNumberId",
+      "businessAccountId",
+      "to",
+      "text",
+      "previewUrl",
+      "mediaType",
+      "mediaUrl",
+      "mediaId",
+      "caption",
+      "latitude",
+      "longitude",
+      "locationName",
+      "address",
+      "contacts",
+      "templateName",
+      "language",
+      "templateComponents",
+      "templateCategory",
+      "templateStatus",
+      "bodyText",
+      "headerText",
+      "footerText",
+      "buttons",
+      "buttonText",
+      "sections",
+      "ctaUrl",
+      "messageId",
+      "contactId",
+      "contactName",
+      "contactPhone",
+      "contactEmail",
+      "labels",
+      "conversationId",
+      "recipients",
+      "limit",
+      "after",
+      "returnAll"
+    ]
+  },
+  {
+    "type": "whatsapp_trigger",
+    "category": "triggers",
+    "inputs": [],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "event"
+    ],
+    "optionalConfig": [
+      "event",
+      "phoneNumberId"
+    ]
+  },
+  {
+    "type": "instagram_trigger",
+    "category": "triggers",
+    "inputs": [],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "event"
+    ],
+    "optionalConfig": [
+      "event",
+      "instagramBusinessAccountId"
+    ]
+  },
+  {
+    "type": "mysql",
+    "category": "database",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "query"
+    ],
+    "optionalConfig": [
+      "query",
+      "parameters"
+    ]
+  },
+  {
+    "type": "mongodb",
+    "category": "database",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation",
+      "collection"
+    ],
+    "optionalConfig": [
+      "operation",
+      "collection",
+      "query"
+    ]
+  },
+  {
+    "type": "firebase",
+    "category": "database",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "projectId",
+      "clientEmail",
+      "privateKey",
+      "operation"
+    ],
+    "optionalConfig": [
+      "collection",
+      "documentId",
+      "data",
+      "filter",
+      "limit",
+      "databaseUrl"
+    ]
+  },
+  {
+    "type": "google_cloud_storage",
+    "category": "database",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "projectId",
+      "clientEmail",
+      "privateKey",
+      "operation",
+      "bucket"
+    ],
+    "optionalConfig": [
+      "fileName",
+      "fileContent",
+      "filter"
+    ]
+  },
+  {
+    "type": "redis",
+    "category": "database",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation",
+      "key"
+    ],
+    "optionalConfig": [
+      "operation",
+      "key",
+      "value"
+    ]
+  },
+  {
+    "type": "odoo",
+    "category": "crm",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation",
+      "model"
+    ],
+    "optionalConfig": [
+      "operation",
+      "model",
+      "domain",
+      "fields",
+      "limit",
+      "offset",
+      "values",
+      "recordId",
+      "method",
+      "methodArgs",
+      "methodKwargs"
+    ]
+  },
+  {
+    "type": "freshdesk",
+    "category": "crm",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "resource",
+      "operation"
+    ],
+    "optionalConfig": [
+      "domain",
+      "apiKey",
+      "resource",
+      "operation",
+      "id",
+      "subject",
+      "descriptionText",
+      "email",
+      "priority",
+      "status",
+      "data"
+    ]
+  },
+  {
+    "type": "intercom",
+    "category": "crm",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation"
+    ],
+    "optionalConfig": [
+      "operation",
+      "conversationId"
+    ]
+  },
+  {
+    "type": "mailchimp",
+    "category": "crm",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation"
+    ],
+    "optionalConfig": [
+      "operation",
+      "listId",
+      "email"
+    ]
+  },
+  {
+    "type": "activecampaign",
+    "category": "crm",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation"
+    ],
+    "optionalConfig": [
+      "operation",
+      "contactId"
+    ]
+  },
+  {
+    "type": "read_binary_file",
+    "category": "file",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "filePath"
+    ],
+    "optionalConfig": [
+      "filePath"
+    ]
+  },
+  {
+    "type": "write_binary_file",
+    "category": "file",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "filePath",
+      "data"
+    ],
+    "optionalConfig": [
+      "filePath",
+      "data"
+    ]
+  },
+  {
+    "type": "aws_s3",
+    "category": "file",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation",
+      "bucket"
+    ],
+    "optionalConfig": [
+      "region",
+      "accessKeyId",
+      "secretAccessKey",
+      "sessionToken",
+      "operation",
+      "bucket",
+      "key",
+      "prefix",
+      "dataBase64",
+      "data"
+    ]
+  },
+  {
+    "type": "dropbox",
+    "category": "file",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation"
+    ],
+    "optionalConfig": [
+      "operation",
+      "path",
+      "dataBase64",
+      "data",
+      "recursive"
+    ]
+  },
+  {
+    "type": "onedrive",
+    "category": "file",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation"
+    ],
+    "optionalConfig": [
+      "operation",
+      "path",
+      "dataBase64",
+      "data"
+    ]
+  },
+  {
+    "type": "ftp",
+    "category": "file",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation",
+      "host"
+    ],
+    "optionalConfig": [
+      "operation",
+      "host",
+      "path"
+    ]
+  },
+  {
+    "type": "sftp",
+    "category": "file",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation",
+      "host"
+    ],
+    "optionalConfig": [
+      "operation",
+      "host",
+      "path"
+    ]
+  },
+  {
+    "type": "github",
+    "category": "devops",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation"
+    ],
+    "optionalConfig": [
+      "operation",
+      "owner",
+      "repo",
+      "title",
+      "body",
+      "issueNumber",
+      "comment",
+      "labels",
+      "ref",
+      "branchName",
+      "workflowId",
+      "accessToken",
+      "apiKey",
+      "credentialId"
+    ]
+  },
+  {
+    "type": "gitlab",
+    "category": "devops",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation"
+    ],
+    "optionalConfig": [
+      "baseUrl",
+      "operation",
+      "repo",
+      "projectId",
+      "issueIid",
+      "title",
+      "descriptionText"
+    ]
+  },
+  {
+    "type": "bitbucket",
+    "category": "devops",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation"
+    ],
+    "optionalConfig": [
+      "operation",
+      "repo"
+    ]
+  },
+  {
+    "type": "jira",
+    "category": "devops",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation"
+    ],
+    "optionalConfig": [
+      "operation",
+      "domain",
+      "projectKey",
+      "issueKey",
+      "summary",
+      "description",
+      "issueType",
+      "priority",
+      "assignee",
+      "labels",
+      "jql",
+      "maxResults",
+      "commentBody",
+      "transitionId"
+    ]
+  },
+  {
+    "type": "jenkins",
+    "category": "devops",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation"
+    ],
+    "optionalConfig": [
+      "operation",
+      "jobName"
+    ]
+  },
+  {
+    "type": "shopify",
+    "category": "ecommerce",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "resource",
+      "operation"
+    ],
+    "optionalConfig": [
+      "shopDomain",
+      "apiKey",
+      "resource",
+      "operation",
+      "id",
+      "productId",
+      "orderId",
+      "customerId",
+      "data",
+      "limit"
+    ]
+  },
+  {
+    "type": "woocommerce",
+    "category": "ecommerce",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "resource",
+      "operation"
+    ],
+    "optionalConfig": [
+      "storeUrl",
+      "apiKey",
+      "apiSecret",
+      "resource",
+      "operation",
+      "id",
+      "data",
+      "perPage"
+    ]
+  },
+  {
+    "type": "stripe",
+    "category": "ecommerce",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation"
+    ],
+    "optionalConfig": [
+      "apiKey",
+      "operation",
+      "amount",
+      "currency",
+      "description",
+      "source",
+      "paymentMethodId",
+      "customerId",
+      "email",
+      "name",
+      "chargeId",
+      "paymentIntentId"
+    ]
+  },
+  {
+    "type": "paypal",
+    "category": "ecommerce",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation"
+    ],
+    "optionalConfig": [
+      "accessToken",
+      "environment",
+      "operation",
+      "amount",
+      "currency",
+      "description",
+      "paymentId",
+      "autoCapture"
+    ]
+  },
+  {
+    "type": "vercel",
+    "category": "devops",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation",
+      "token"
+    ],
+    "optionalConfig": [
+      "operation",
+      "projectName",
+      "token"
+    ]
+  },
+  {
+    "type": "schedulewise",
+    "category": "integration",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation"
+    ],
+    "optionalConfig": [
+      "credentialId",
+      "dateFrom",
+      "dateTo",
+      "patientId",
+      "staffId",
+      "appointmentId",
+      "startDateTime",
+      "endDateTime",
+      "serviceType",
+      "notes",
+      "status",
+      "limit",
+      "hardDelete",
+      "timeoutSec",
+      "retries",
+      "outputFormat",
+      "mockMode"
+    ]
+  },
+  {
+    "type": "calendly",
+    "category": "productivity",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "accessToken",
+      "operation"
+    ],
+    "optionalConfig": [
+      "accessToken",
+      "operation",
+      "userUri",
+      "eventTypeUri"
+    ]
+  },
+  {
+    "type": "chargebee",
+    "category": "payment",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation",
+      "apiKey",
+      "site"
+    ],
+    "optionalConfig": [
+      "operation",
+      "apiKey",
+      "site",
+      "customerId",
+      "email",
+      "planId",
+      "subscriptionId"
+    ]
+  },
+  {
+    "type": "typeform",
+    "category": "productivity",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation",
+      "apiKey"
+    ],
+    "optionalConfig": [
+      "operation",
+      "apiKey",
+      "formId",
+      "title"
+    ]
+  },
+  {
+    "type": "xero",
+    "category": "http_api",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "accessToken",
+      "tenantId",
+      "resource",
+      "operation"
+    ],
+    "optionalConfig": [
+      "accessToken",
+      "tenantId",
+      "resource",
+      "operation",
+      "recordId",
+      "payload",
+      "where",
+      "order",
+      "page",
+      "modifiedAfter"
+    ]
+  },
+  {
+    "type": "oracle_database",
+    "category": "database",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "user",
+      "password",
+      "connectionString",
+      "operation"
+    ],
+    "optionalConfig": [
+      "user",
+      "password",
+      "connectionString",
+      "operation",
+      "schema",
+      "table",
+      "statement",
+      "limit"
+    ]
+  },
+  {
+    "type": "sql_server",
+    "category": "database",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "host",
+      "username",
+      "password",
+      "database",
+      "operation"
+    ],
+    "optionalConfig": [
+      "host",
+      "port",
+      "username",
+      "password",
+      "database",
+      "encrypt",
+      "trustServerCertificate",
+      "operation",
+      "query",
+      "table",
+      "procedureName"
+    ]
+  },
+  {
+    "type": "timescaledb",
+    "category": "database",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "host",
+      "username",
+      "password",
+      "database",
+      "operation"
+    ],
+    "optionalConfig": [
+      "host",
+      "port",
+      "username",
+      "password",
+      "database",
+      "ssl",
+      "operation",
+      "query",
+      "table",
+      "timeColumn",
+      "interval",
+      "valueColumn"
+    ]
+  },
+  {
+    "type": "contentful",
+    "category": "cms",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation",
+      "spaceId",
+      "accessToken"
+    ],
+    "optionalConfig": [
+      "operation",
+      "spaceId",
+      "accessToken",
+      "environment",
+      "contentType",
+      "entryId",
+      "fields"
+    ]
+  },
+  {
+    "type": "wordpress",
+    "category": "cms",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation",
+      "siteUrl",
+      "username",
+      "password"
+    ],
+    "optionalConfig": [
+      "operation",
+      "siteUrl",
+      "username",
+      "password",
+      "postId",
+      "title",
+      "content",
+      "status",
+      "limit"
+    ]
+  },
+  {
+    "type": "zendesk",
+    "category": "crm",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation",
+      "subdomain",
+      "email",
+      "apiToken"
+    ],
+    "optionalConfig": [
+      "operation",
+      "subdomain",
+      "email",
+      "apiToken",
+      "ticketId",
+      "subject",
+      "description",
+      "status",
+      "priority",
+      "limit"
+    ]
+  },
+  {
+    "type": "netlify",
+    "category": "devops",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "resource",
+      "operation"
+    ],
+    "optionalConfig": [
+      "accessToken",
+      "resource",
+      "operation",
+      "siteId",
+      "deployId",
+      "payload",
+      "limit"
+    ]
+  },
+  {
+    "type": "workday",
+    "category": "http_api",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "resource",
+      "operation"
+    ],
+    "optionalConfig": [
+      "baseUrl",
+      "tenant",
+      "authType",
+      "accessToken",
+      "username",
+      "password",
+      "resource",
+      "operation",
+      "recordId",
+      "payload",
+      "limit",
+      "offset"
+    ]
+  },
+  {
+    "type": "pinecone",
+    "category": "database",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation",
+      "index"
+    ],
+    "optionalConfig": [
+      "operation",
+      "index",
+      "apiKey",
+      "vector",
+      "topK",
+      "id",
+      "metadata",
+      "namespace"
+    ]
+  },
+  {
+    "type": "qdrant",
+    "category": "database",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation",
+      "url",
+      "collection"
+    ],
+    "optionalConfig": [
+      "operation",
+      "url",
+      "collection",
+      "apiKey",
+      "vector",
+      "limit",
+      "id",
+      "payload",
+      "withPayload"
+    ]
+  },
+  {
+    "type": "cohere",
+    "category": "ai",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "model",
+      "prompt"
+    ],
+    "optionalConfig": [
+      "model",
+      "prompt",
+      "preamble",
+      "apiKey",
+      "temperature",
+      "maxTokens"
+    ]
+  },
+  {
+    "type": "langchain",
+    "category": "ai",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation",
+      "prompt"
+    ],
+    "optionalConfig": [
+      "operation",
+      "provider",
+      "prompt",
+      "tools",
+      "memory",
+      "apiKey"
+    ]
+  },
+  {
+    "type": "lightricks",
+    "category": "ai",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "prompt"
+    ],
+    "optionalConfig": [
+      "prompt",
+      "mode",
+      "image_url",
+      "audio_url",
+      "video_url",
+      "duration",
+      "fps",
+      "resolution",
+      "options"
+    ]
+  },
+  {
+    "type": "huggingface",
+    "category": "ai",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "model",
+      "prompt"
+    ],
+    "optionalConfig": [
+      "model",
+      "prompt",
+      "maxTokens",
+      "temperature"
+    ]
+  },
+  {
+    "type": "mistral",
+    "category": "ai",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "model",
+      "prompt"
+    ],
+    "optionalConfig": [
+      "model",
+      "systemPrompt",
+      "prompt",
+      "temperature",
+      "maxTokens"
+    ]
+  },
+  {
+    "type": "linear",
+    "category": "productivity",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation"
+    ],
+    "optionalConfig": [
+      "operation",
+      "teamId",
+      "issueId",
+      "title",
+      "description",
+      "stateId",
+      "priority"
+    ]
+  },
+  {
+    "type": "trello",
+    "category": "productivity",
+    "inputs": [
+      "input",
+      "inputData"
+    ],
+    "outputs": [
+      "output",
+      "data",
+      "result"
+    ],
+    "requiredConfig": [
+      "operation"
+    ],
+    "optionalConfig": [
+      "operation",
+      "boardId",
+      "listId",
+      "cardId",
+      "cardName",
+      "cardDesc"
+    ]
+  }
+]

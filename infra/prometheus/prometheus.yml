@@ -1,0 +1,79 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    environment: production
+    service_group: ctrlchecks
+
+# Scrape configs — all services bind to 127.0.0.1 and Prometheus runs on the same host
+scrape_configs:
+
+  # Worker — main API service (port 3001)
+  - job_name: ctrlchecks-worker
+    static_configs:
+      - targets: ['127.0.0.1:3001']
+    metrics_path: /metrics
+    scrape_interval: 15s
+    relabel_configs:
+      - target_label: service
+        replacement: worker
+
+  # AI Generator service (port 3002)
+  - job_name: ctrlchecks-ai-generator
+    static_configs:
+      - targets: ['127.0.0.1:3002']
+    metrics_path: /metrics
+    scrape_interval: 15s
+    relabel_configs:
+      - target_label: service
+        replacement: ai-generator
+
+  # Execution Engine service (port 3003)
+  - job_name: ctrlchecks-execution-engine
+    static_configs:
+      - targets: ['127.0.0.1:3003']
+    metrics_path: /metrics
+    scrape_interval: 15s
+    relabel_configs:
+      - target_label: service
+        replacement: execution-engine
+
+  # Credential Service (port 3004)
+  - job_name: ctrlchecks-credential-service
+    static_configs:
+      - targets: ['127.0.0.1:3004']
+    metrics_path: /metrics
+    scrape_interval: 15s
+    relabel_configs:
+      - target_label: service
+        replacement: credential-service
+
+  # Notification Service (port 3005)
+  - job_name: ctrlchecks-notification-service
+    static_configs:
+      - targets: ['127.0.0.1:3005']
+    metrics_path: /metrics
+    scrape_interval: 15s
+    relabel_configs:
+      - target_label: service
+        replacement: notification-service
+
+  # Trigger Service (port 3006)
+  - job_name: ctrlchecks-trigger-service
+    static_configs:
+      - targets: ['127.0.0.1:3006']
+    metrics_path: /metrics
+    scrape_interval: 15s
+    relabel_configs:
+      - target_label: service
+        replacement: trigger-service
+
+  # Workflow CRUD Service (port 3007)
+  - job_name: ctrlchecks-workflow-crud-service
+    static_configs:
+      - targets: ['127.0.0.1:3007']
+    metrics_path: /metrics
+    scrape_interval: 15s
+    relabel_configs:
+      - target_label: service
+        replacement: workflow-crud-service

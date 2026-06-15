@@ -1,0 +1,354 @@
+import type { UnifiedNodeDefinition } from '../types/unified-node-contract';
+import type { NodeSchema } from '../../services/nodes/node-library';
+import { applyGeneratedOperationContracts } from './generated-node-operation-contracts';
+
+import { overrideGoogleGmail } from './overrides/google-gmail';
+import { overrideIfElse } from './overrides/if-else';
+import { overrideLogOutput } from './overrides/log-output';
+import { overrideChatModel } from './overrides/chat-model';
+import { overrideDatabaseRead } from './overrides/database-read';
+import { overrideDatabaseWrite } from './overrides/database-write';
+import { overrideAiAgent } from './overrides/ai-agent';
+import { overrideAiChatModel } from './overrides/ai-chat-model';
+import { overrideOllama } from './overrides/ollama';
+import { overrideOpenAiGpt } from './overrides/openai-gpt';
+import { overrideAnthropicClaude } from './overrides/anthropic-claude';
+import { overrideGoogleGemini } from './overrides/google-gemini';
+import { overrideTimeout } from './overrides/timeout';
+import { overrideTryCatch } from './overrides/try-catch';
+import { overrideRetry } from './overrides/retry';
+import { overrideParallel } from './overrides/parallel';
+import { overrideManualTrigger } from './overrides/manual-trigger';
+import { overrideChatTrigger } from './overrides/chat-trigger';
+import { overrideWebhook } from './overrides/webhook';
+import { overrideSchedule } from './overrides/schedule';
+import { overrideInterval } from './overrides/interval';
+import { overrideFormTrigger } from './overrides/form-trigger';
+import { overrideWorkflowTrigger } from './overrides/workflow-trigger';
+import { overrideErrorTrigger } from './overrides/error-trigger';
+import { overrideSwitch } from './overrides/switch';
+import { overrideSetVariable } from './overrides/set-variable';
+import { overrideSet } from './overrides/set';
+import { overrideEditFields } from './overrides/edit-fields';
+import { overrideRenameKeys } from './overrides/rename-keys';
+import { overrideMath } from './overrides/math';
+import { overrideWait } from './overrides/wait';
+import { overrideDelay } from './overrides/delay';
+import { overrideReturn } from './overrides/return';
+import { overrideSort } from './overrides/sort';
+import { overrideLimit } from './overrides/limit';
+import { overrideAggregate } from './overrides/aggregate';
+import { overrideHttpRequest } from './overrides/http-request';
+import { overrideSlackMessage } from './overrides/slack-message';
+import { overrideGoogleSheets } from './overrides/google-sheets';
+import { overrideAirtable } from './overrides/airtable';
+import { overrideNotion } from './overrides/notion';
+import { overrideHubspot } from './overrides/hubspot';
+import { overrideSalesforce } from './overrides/salesforce';
+import { overridePipedrive } from './overrides/pipedrive';
+import { overrideActivecampaign } from './overrides/activecampaign';
+import { overrideMailchimp } from './overrides/mailchimp';
+import { overrideIntercom } from './overrides/intercom';
+import { overrideEmail } from './overrides/email';
+import { overrideTelegram } from './overrides/telegram';
+import { overrideDiscord } from './overrides/discord';
+import { overrideExecuteWorkflow } from './overrides/execute-workflow';
+import { overrideJavascript } from './overrides/javascript';
+import { overrideTextSummarizer } from './overrides/text-summarizer';
+import { overrideSentimentAnalyzer } from './overrides/sentiment-analyzer';
+import { overrideMicrosoftTeams } from './overrides/microsoft-teams';
+import { overrideWhatsappCloud } from './overrides/whatsapp-cloud';
+import { overrideTwilio } from './overrides/twilio';
+import { overrideMailgun } from './overrides/mailgun';
+import { overrideSendgrid } from './overrides/sendgrid';
+import { overrideGoogleDoc } from './overrides/google-doc';
+import { overrideGoogleDrive } from './overrides/google-drive';
+import { overrideGoogleContacts } from './overrides/google-contacts';
+import { overrideGoogleTasks } from './overrides/google-tasks';
+import { overrideGoogleBigQuery } from './overrides/google-bigquery';
+import { overrideZoho } from './overrides/zoho';
+import { overrideFilter } from './overrides/filter';
+import { overrideLoop } from './overrides/loop';
+import { overrideSplitInBatches } from './overrides/split-in-batches';
+import { overrideHttpResponse } from './overrides/http-response';
+import { overrideGraphql } from './overrides/graphql';
+import { overrideFunction } from './overrides/function';
+import { overrideFunctionItem } from './overrides/function-item';
+import { overrideAiService } from './overrides/ai-service';
+import { overrideAwsS3 } from './overrides/aws-s3';
+import { overrideDropbox } from './overrides/dropbox';
+import { overrideOnedrive } from './overrides/onedrive';
+import { overrideFtp } from './overrides/ftp';
+import { overrideSftp } from './overrides/sftp';
+import { overrideQueuePush } from './overrides/queue-push';
+import { overrideQueueConsume } from './overrides/queue-consume';
+import { overrideCacheGet } from './overrides/cache-get';
+import { overrideCacheSet } from './overrides/cache-set';
+import { overrideOauth2Auth } from './overrides/oauth2-auth';
+import { overrideApiKeyAuth } from './overrides/api-key-auth';
+import { overrideReadBinaryFile } from './overrides/read-binary-file';
+import { overrideWriteBinaryFile } from './overrides/write-binary-file';
+import { overridePostgresql } from './overrides/postgresql';
+import { overrideSupabase } from './overrides/supabase';
+import { overrideMysql } from './overrides/mysql';
+import { overrideMongodb } from './overrides/mongodb';
+import { overrideFirebase } from './overrides/firebase';
+import { overrideGCS } from './overrides/gcs';
+import { overrideTwitter } from './overrides/twitter';
+import { overrideInstagram } from './overrides/instagram';
+import { overrideDateTime } from './overrides/date-time';
+import { overrideTextFormatter } from './overrides/text-formatter';
+import { overrideHtml } from './overrides/html';
+import { overrideXml } from './overrides/xml';
+import { overrideMerge } from './overrides/merge';
+import { overrideYoutube } from './overrides/youtube';
+import { overrideFacebook } from './overrides/facebook';
+import { overrideLinkedin } from './overrides/linkedin';
+import { overrideShopify } from './overrides/shopify';
+import { overrideWoocommerce } from './overrides/woocommerce';
+import { overrideStripe } from './overrides/stripe';
+import { overridePaypal } from './overrides/paypal';
+import { overrideGithub } from './overrides/github';
+import { overrideGitlab } from './overrides/gitlab';
+import { overrideBitbucket } from './overrides/bitbucket';
+import { overrideClickup } from './overrides/clickup';
+import { overrideOutlook } from './overrides/outlook';
+import { overrideMemory } from './overrides/memory';
+import { overrideTool } from './overrides/tool';
+import { overrideWhatsapp } from './overrides/whatsapp';
+import { overrideWhatsappTrigger } from './overrides/whatsapp-trigger';
+import { overrideInstagramTrigger } from './overrides/instagram-trigger';
+
+import { overrideIntuitSmes } from './overrides/intuit-smes';
+import { overrideTally } from './overrides/tally';
+import { overrideOdoo } from './overrides/odoo';
+import { overrideZoomVideo } from './overrides/zoom-video';
+import { overrideMicrosoftDynamics } from './overrides/microsoft-dynamics';
+import { overrideSap } from './overrides/sap';
+import { overrideVercel } from './overrides/vercel';
+import { overrideJenkins } from './overrides/jenkins';
+import { overrideScheduleWise } from './overrides/schedulewise';
+// ── Previously-unregistered node overrides ──────────────────────────────────
+import { overrideCalendly } from './overrides/calendly';
+import { overrideChargebee } from './overrides/chargebee';
+import { overrideTypeform } from './overrides/typeform';
+import { overrideXero } from './overrides/xero';
+import { overrideOracleDatabase } from './overrides/oracle-database';
+import { overrideContentful } from './overrides/contentful-node';
+import { overrideWordPress } from './overrides/wordpress';
+import { overrideZendesk } from './overrides/zendesk-node';
+import { overrideNetlify } from './overrides/netlify';
+import { overrideWorkday } from './overrides/workday';
+import { overridePinecone } from './overrides/pinecone';
+import { overrideQdrant } from './overrides/qdrant';
+import { overrideCohere } from './overrides/cohere';
+import { overrideLangchain } from './overrides/langchain';
+import { overrideLightricks } from './overrides/lightricks';
+
+type OverrideFn = (def: UnifiedNodeDefinition, schema: NodeSchema) => UnifiedNodeDefinition;
+
+const overridesByType: Record<string, OverrideFn> = {
+  google_gmail: overrideGoogleGmail,
+  if_else: overrideIfElse,
+  log_output: overrideLogOutput,
+  chat_model: overrideChatModel,
+  database_read: overrideDatabaseRead,
+  database_write: overrideDatabaseWrite,
+  ai_agent: overrideAiAgent,
+  ai_chat_model: overrideAiChatModel,
+  ollama: overrideOllama,
+  openai_gpt: overrideOpenAiGpt,
+  anthropic_claude: overrideAnthropicClaude,
+  google_gemini: overrideGoogleGemini,
+  timeout: overrideTimeout,
+  try_catch: overrideTryCatch,
+  retry: overrideRetry,
+  parallel: overrideParallel,
+  // ✅ NEWLY MIGRATED NODES
+  manual_trigger: overrideManualTrigger,
+  chat_trigger: overrideChatTrigger,
+  webhook: overrideWebhook,
+  schedule: overrideSchedule,
+  interval: overrideInterval,
+  // Form Trigger schema uses library type `form` (see createFormTriggerSchema); `form_trigger` is the workflow node alias.
+  form: overrideFormTrigger,
+  form_trigger: overrideFormTrigger,
+  workflow_trigger: overrideWorkflowTrigger,
+  error_trigger: overrideErrorTrigger,
+  switch: overrideSwitch,
+  set_variable: overrideSetVariable,
+  set: overrideSet,
+  edit_fields: overrideEditFields,
+  rename_keys: overrideRenameKeys,
+  math: overrideMath,
+  wait: overrideWait,
+  delay: overrideDelay,
+  return: overrideReturn,
+  sort: overrideSort,
+  limit: overrideLimit,
+  aggregate: overrideAggregate,
+  http_request: overrideHttpRequest,
+  slack_message: overrideSlackMessage,
+  google_sheets: overrideGoogleSheets,
+  airtable: overrideAirtable,
+  notion: overrideNotion,
+  hubspot: overrideHubspot,
+  salesforce: overrideSalesforce,
+  pipedrive: overridePipedrive,
+  activecampaign: overrideActivecampaign,
+  mailchimp: overrideMailchimp,
+  intercom: overrideIntercom,
+  microsoft_dynamics: overrideMicrosoftDynamics,
+  sap: overrideSap,
+  intuit_smes: overrideIntuitSmes,
+  tally: overrideTally,
+  email: overrideEmail,
+  telegram: overrideTelegram,
+  discord: overrideDiscord,
+  execute_workflow: overrideExecuteWorkflow,
+  javascript: overrideJavascript,
+  text_summarizer: overrideTextSummarizer,
+  sentiment_analyzer: overrideSentimentAnalyzer,
+  // ✅ BATCH 3: Remaining Communication & Storage
+  microsoft_teams: overrideMicrosoftTeams,
+  whatsapp_cloud: overrideWhatsappCloud,
+  twilio: overrideTwilio,
+  mailgun: overrideMailgun,
+  sendgrid: overrideSendgrid,
+  google_doc: overrideGoogleDoc,
+  google_drive: overrideGoogleDrive,
+  google_contacts: overrideGoogleContacts,
+  google_tasks: overrideGoogleTasks,
+  google_bigquery: overrideGoogleBigQuery,
+  zoho: overrideZoho,
+  // ✅ BATCH 4: Data Transformation & HTTP
+  filter: overrideFilter,
+  loop: overrideLoop,
+  split_in_batches: overrideSplitInBatches,
+  http_response: overrideHttpResponse,
+  graphql: overrideGraphql,
+  // ✅ BATCH 5: Utility & AI
+  function: overrideFunction,
+  function_item: overrideFunctionItem,
+  ai_service: overrideAiService,
+  // ✅ BATCH 6: Storage
+  aws_s3: overrideAwsS3,
+  dropbox: overrideDropbox,
+  onedrive: overrideOnedrive,
+  ftp: overrideFtp,
+  sftp: overrideSftp,
+  // ✅ BATCH 7: Queue & Cache
+  queue_push: overrideQueuePush,
+  queue_consume: overrideQueueConsume,
+  cache_get: overrideCacheGet,
+  cache_set: overrideCacheSet,
+  // ✅ BATCH 8: Auth & File
+  oauth2_auth: overrideOauth2Auth,
+  api_key_auth: overrideApiKeyAuth,
+  read_binary_file: overrideReadBinaryFile,
+  write_binary_file: overrideWriteBinaryFile,
+  // ✅ BATCH 9: Database
+  postgresql: overridePostgresql,
+  db: overrideSupabase,
+  mysql: overrideMysql,
+  mongodb: overrideMongodb,
+  firebase: overrideFirebase,
+  google_cloud_storage: overrideGCS,
+  // ✅ CRM: Odoo ERP
+  odoo: overrideOdoo,
+  // ✅ BATCH 10: Social Media
+  twitter: overrideTwitter,
+  instagram: overrideInstagram,
+  youtube: overrideYoutube,
+  facebook: overrideFacebook,
+  linkedin: overrideLinkedin,
+  // ✅ WhatsApp & Instagram full nodes
+  whatsapp: overrideWhatsapp,
+  whatsapp_trigger: overrideWhatsappTrigger,
+  instagram_trigger: overrideInstagramTrigger,
+  // ✅ BATCH 11: E-commerce & Payments
+  shopify: overrideShopify,
+  woocommerce: overrideWoocommerce,
+  stripe: overrideStripe,
+  paypal: overridePaypal,
+  // ✅ BATCH 12: Version Control
+  github: overrideGithub,
+  gitlab: overrideGitlab,
+  bitbucket: overrideBitbucket,
+  // ✅ BATCH 13: Other Integrations
+  clickup: overrideClickup,
+  outlook: overrideOutlook,
+  // ✅ BATCH 14: Utilities
+  date_time: overrideDateTime,
+  text_formatter: overrideTextFormatter,
+  html: overrideHtml,
+  xml: overrideXml,
+  merge: overrideMerge,
+  // ✅ BATCH 15: AI Infrastructure
+  memory: overrideMemory,
+  tool: overrideTool,
+  // ✅ BATCH 16: Video Conferencing
+  zoom_video: overrideZoomVideo,
+  // ✅ BATCH 17: DevOps & Deployment
+  vercel: overrideVercel,
+  jenkins: overrideJenkins,
+  // ✅ ScheduleWise healthcare scheduling integration
+  schedulewise: overrideScheduleWise,
+  // ── Tier-2: API nodes with switch cases, now properly registered ──────────
+  calendly: overrideCalendly,
+  chargebee: overrideChargebee,
+  typeform: overrideTypeform,
+  xero: overrideXero,
+  oracle_database: overrideOracleDatabase,
+  // ── Tier-3: nodes needing both schema registration and execution wiring ───
+  contentful: overrideContentful,
+  wordpress: overrideWordPress,
+  zendesk: overrideZendesk,
+  netlify: overrideNetlify,
+  workday: overrideWorkday,
+  pinecone: overridePinecone,
+  qdrant: overrideQdrant,
+  cohere: overrideCohere,
+  langchain: overrideLangchain,
+  lightricks: overrideLightricks,
+};
+
+/**
+ * Apply per-node overrides to a base unified definition.
+ * This keeps UnifiedNodeRegistry generic and pushes node-specific behavior into one file per node.
+ */
+export function applyNodeDefinitionOverrides(def: UnifiedNodeDefinition, schema: NodeSchema): UnifiedNodeDefinition {
+  const fn = overridesByType[schema.type];
+  const next = applyGeneratedOperationContracts(fn ? fn(def, schema) : def);
+  const credentialFields = next.credentialSchema?.credentialFields ?? [];
+  const requirements = next.credentialSchema?.requirements ?? [];
+
+  if (credentialFields.length === 0 || requirements.length > 0) {
+    return next;
+  }
+
+  return {
+    ...next,
+    credentialSchema: {
+      ...next.credentialSchema,
+      requirements: [
+        {
+          provider: next.type,
+          category: 'api_key',
+          required: true,
+          description: `${next.label} credentials`,
+          scopes: [],
+        },
+      ],
+    },
+  };
+}
+
+/** Node types that replace `execute` (or related) via registry overrides — used for compliance matrix / audits. */
+export function getNodeTypesWithExecuteOverrides(): string[] {
+  return Object.keys(overridesByType).sort();
+}
+
+export function hasRegistryExecuteOverride(nodeType: string): boolean {
+  return Object.prototype.hasOwnProperty.call(overridesByType, nodeType);
+}

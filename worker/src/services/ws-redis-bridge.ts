@@ -54,12 +54,15 @@ export async function initWsRedisBridge(visualizationService: {
     return;
   }
 
-  // Subscriber needs a dedicated connection (subscribing locks the client)
-  const subscriber = await getRedisClient();
-  if (!subscriber) {
-    console.warn('[WsRedisBridge] Could not get Redis subscriber client.');
-    return;
-  }
+  // Subscriber needs a dedicated connection — subscribing locks a client into
+  // subscriber mode, and getRedisClient() returns the same shared singleton
+  // used everywhere else (e.g. execution-queue's zcard/zadd). duplicate()
+  // opens a separate physical connection with the same options so the
+  // shared singleton never gets locked.
+  const subscriber = publisher.duplicate();
+  subscriber.on('error', (err: any) => {
+    console.error('[WsRedisBridge] Subscriber connection error:', err?.message);
+  });
 
   // ── OUTBOUND: local broadcast → Redis ────────────────────────────────────
   visualizationService.on('broadcast', ({ executionId, message }) => {

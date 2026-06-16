@@ -486,13 +486,16 @@ export function materializeStructuralFields(
       }
     }
 
+    // Reconcile every field to its registry-computed effective mode — including fields that
+    // already carry an explicit-but-policy-invalid stamp (e.g. AI tagged `runtime_ai` on a field
+    // where the registry sets `supportsRuntimeAI: false`). buildEffectiveFillModes already applies
+    // coerceFieldFillModeByPolicy per field, so a stamp that's already policy-correct is a no-op here.
     const effectiveFillModes = buildEffectiveFillModes(inputSchema, config);
     for (const fieldName of Object.keys(inputSchema)) {
       const cur = fillMode[fieldName];
-      const explicitValid =
-        cur === 'manual_static' || cur === 'runtime_ai' || cur === 'buildtime_ai_once';
-      if (!explicitValid && effectiveFillModes[fieldName] !== undefined) {
-        fillMode[fieldName] = effectiveFillModes[fieldName];
+      const effective = effectiveFillModes[fieldName];
+      if (effective !== undefined && effective !== cur) {
+        fillMode[fieldName] = effective;
         changed = true;
       }
     }

@@ -3893,10 +3893,18 @@ export function AutonomousAgentWizard() {
                             if (effectiveModesFromBackend && Object.keys(effectiveModesFromBackend).length > 0) {
                                 setFillModeValues((prev) => ({ ...prev, ...effectiveModesFromBackend }));
                             }
-                            // Log validation warnings but do NOT block navigation
+                            // Block navigation when the backend reports unresolved field/ownership
+                            // issues (e.g. a structural field coerced away from runtime_ai still has
+                            // no value) instead of silently committing a workflow that will fail to save.
                             const iv = inputsResult?.validation;
                             if (iv && iv.valid === false && Array.isArray(iv.errors) && iv.errors.length > 0) {
-                                console.warn('?? Attach inputs validation warnings (non-blocking):', iv.errors);
+                                console.warn('?? Attach inputs validation failed:', iv.errors);
+                                toast({
+                                    title: 'Workflow needs attention before it can be opened',
+                                    description: iv.errors.slice(0, 3).join(' • ').slice(0, 500),
+                                    variant: 'destructive',
+                                });
+                                return; // isNavigating stays false — button re-enabled for retry after fixing ownership modes
                             }
                         }
                     } else {

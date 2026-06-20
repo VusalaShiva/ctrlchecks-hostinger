@@ -58,6 +58,17 @@ export function shouldUseCredentialService(userId: string): boolean {
   return fnv1a(userId) % 100 < pct;
 }
 
+// ── Phase 4 — vault-writes retirement gate ───────────────────────────────────
+
+/**
+ * When true: canary users whose remote write returns null get 503 instead of
+ * falling back to local vault writes. Prevents double-write during retirement soak.
+ * Default: false — set true only after stable soak at CANARY=100.
+ */
+export function isCredentialVaultWritesDisabled(): boolean {
+  return process.env.CREDENTIAL_SERVICE_VAULT_WRITES_DISABLED === 'true';
+}
+
 export function getBaseUrl(): string {
   return (process.env.CREDENTIAL_SERVICE_URL ?? 'http://localhost:3004').replace(/\/$/, '');
 }

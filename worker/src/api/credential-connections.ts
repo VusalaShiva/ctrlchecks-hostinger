@@ -74,7 +74,7 @@ export async function createConnectionHandler(req: Request, res: Response) {
   const uid = userId(req);
 
   // Canary: delegate to credential-service if enabled for this user
-  const { shouldUseCredentialService, createConnectionRemote } = await import('../services/credential-service-client');
+  const { shouldUseCredentialService, createConnectionRemote, isCredentialVaultWritesDisabled } = await import('../services/credential-service-client');
   if (shouldUseCredentialService(uid)) {
     const remote = await createConnectionRemote(uid, {
       name: req.body.name,
@@ -90,6 +90,9 @@ export async function createConnectionHandler(req: Request, res: Response) {
         if (redis) invalidateAllMissingItemsCaches(redis).catch(() => {});
       }).catch(() => {});
       return res.status(201).json({ connection: remote, source: 'credential-service' });
+    }
+    if (isCredentialVaultWritesDisabled()) {
+      return res.status(503).json({ error: 'Credential service unavailable', code: 'CREDENTIAL_SERVICE_UNAVAILABLE' });
     }
     console.warn('[createConnectionHandler] Credential-service fallback for user:', uid);
   }
@@ -113,7 +116,7 @@ export async function updateConnectionHandler(req: Request, res: Response) {
   const uid = userId(req);
   const { id } = req.params;
 
-  const { shouldUseCredentialService, updateConnectionRemote } = await import('../services/credential-service-client');
+  const { shouldUseCredentialService, updateConnectionRemote, isCredentialVaultWritesDisabled } = await import('../services/credential-service-client');
   if (shouldUseCredentialService(uid)) {
     const remote = await updateConnectionRemote(uid, id, {
       name: req.body.name,
@@ -126,6 +129,9 @@ export async function updateConnectionHandler(req: Request, res: Response) {
         if (redis) invalidateAllMissingItemsCaches(redis).catch(() => {});
       }).catch(() => {});
       return res.json({ connection: remote, source: 'credential-service' });
+    }
+    if (isCredentialVaultWritesDisabled()) {
+      return res.status(503).json({ error: 'Credential service unavailable', code: 'CREDENTIAL_SERVICE_UNAVAILABLE' });
     }
     console.warn('[updateConnectionHandler] Credential-service fallback for user:', uid);
   }
@@ -147,10 +153,13 @@ export async function deleteConnectionHandler(req: Request, res: Response) {
   const uid = userId(req);
   const { id } = req.params;
 
-  const { shouldUseCredentialService, deleteConnectionByIdRemote } = await import('../services/credential-service-client');
+  const { shouldUseCredentialService, deleteConnectionByIdRemote, isCredentialVaultWritesDisabled } = await import('../services/credential-service-client');
   if (shouldUseCredentialService(uid)) {
     const ok = await deleteConnectionByIdRemote(uid, id);
     if (ok) return res.status(204).send();
+    if (isCredentialVaultWritesDisabled()) {
+      return res.status(503).json({ error: 'Credential service unavailable', code: 'CREDENTIAL_SERVICE_UNAVAILABLE' });
+    }
     console.warn('[deleteConnectionHandler] Credential-service fallback for user:', uid);
   }
 
@@ -162,10 +171,13 @@ export async function testConnectionHandler(req: Request, res: Response) {
   const uid = userId(req);
   const { id } = req.params;
 
-  const { shouldUseCredentialService, testConnectionRemote } = await import('../services/credential-service-client');
+  const { shouldUseCredentialService, testConnectionRemote, isCredentialVaultWritesDisabled } = await import('../services/credential-service-client');
   if (shouldUseCredentialService(uid)) {
     const remote = await testConnectionRemote(uid, id);
     if (remote !== null) return res.json({ ...remote, source: 'credential-service' });
+    if (isCredentialVaultWritesDisabled()) {
+      return res.status(503).json({ error: 'Credential service unavailable', code: 'CREDENTIAL_SERVICE_UNAVAILABLE' });
+    }
     console.warn('[testConnectionHandler] Credential-service fallback for user:', uid);
   }
 

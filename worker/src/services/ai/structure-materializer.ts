@@ -171,6 +171,66 @@ function operatorMeta(op: string): { normalizedOp: string; ruleOperator: string 
   return { normalizedOp, ruleOperator };
 }
 
+// Pattern set for deriveIfElseConditionsFromIntent — ordered most-specific first.
+// Each entry: [regex, operator, groupIndex_field, groupIndex_value]
+// Supports: numeric comparisons, string equality, contains/not_contains.
+const IF_ELSE_INTENT_PATTERNS: Array<{
+  re: RegExp;
+  operator: string;
+  fieldGroup: number;
+  valueGroup: number;
+}> = [
+  // Numeric/symbol operators: >=, <=, >, <, ==, =, !=
+  {
+    re: /\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(>=|<=|>|<|==|!=|=)\s*([0-9]+(?:\.[0-9]+)?|[a-zA-Z_][a-zA-Z0-9_]*)/,
+    operator: '__symbol__',
+    fieldGroup: 1,
+    valueGroup: 3,
+  },
+  // English comparison words
+  {
+    re: /\b([a-zA-Z_][a-zA-Z0-9_]*)\s+(greater than|less than|equal to|equals)\s+([0-9]+(?:\.[0-9]+)?|[a-zA-Z_][a-zA-Z0-9_]*)/i,
+    operator: '__word_compare__',
+    fieldGroup: 1,
+    valueGroup: 3,
+  },
+  // "if <field> is greater/less than <num>"
+  {
+    re: /\bif\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+is\s+(greater than|less than|equal to)\s+([0-9]+(?:\.[0-9]+)?)/i,
+    operator: '__word_compare__',
+    fieldGroup: 1,
+    valueGroup: 3,
+  },
+  // "<field> does not contain / doesn't contain / not contain <value>"
+  {
+    re: /\b([a-zA-Z_][a-zA-Z0-9_\s]*?)\s+(?:does not contain|doesn't contain|not contain)\s+["']?([^"'\n,]+?)["']?(?:\s+|$)/i,
+    operator: 'not_contains',
+    fieldGroup: 1,
+    valueGroup: 2,
+  },
+  // "<field> contains / includes <value>"
+  {
+    re: /\b([a-zA-Z_][a-zA-Z0-9_\s]*?)\s+(?:contains?|includes?)\s+["']?([^"'\n,]+?)["']?(?:\s+|$)/i,
+    operator: 'contains',
+    fieldGroup: 1,
+    valueGroup: 2,
+  },
+  // "<field> is not <value>"
+  {
+    re: /\b([a-zA-Z_][a-zA-Z0-9_]*)\s+is\s+not\s+["']?([a-zA-Z0-9_][a-zA-Z0-9_\s-]*)["']?/i,
+    operator: 'not_equals',
+    fieldGroup: 1,
+    valueGroup: 2,
+  },
+  // "if <field> is <value>" — must come after "is not"
+  {
+    re: /\bif\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+is\s+["']?([a-zA-Z0-9_][a-zA-Z0-9_\s-]*)["']?/i,
+    operator: 'equals',
+    fieldGroup: 1,
+    valueGroup: 2,
+  },
+];
+
 /**
  * Structural defaults for if_else. When `formFields` is set (upstream form output keys),
  * emit `$json.<internalKey>` so conditions match runtime merged input / $json.
@@ -185,55 +245,33 @@ export function deriveIfElseConditionsFromIntent(
     .replace(/≥/g, '>=')
     .replace(/–/g, '-')
     .replace(/—/g, '-');
-  const patterns: RegExp[] = [
-    /\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(>=|<=|>|<|==|=|!=)\s*([0-9]+(?:\.[0-9]+)?|[a-zA-Z_][a-zA-Z0-9_]*)/,
-    /\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(greater than|less than|equals|equal to)\s*([0-9]+(?:\.[0-9]+)?|[a-zA-Z_][a-zA-Z0-9_]*)/i,
-    /\bif\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+is\s+(greater than|less than|equal to)\s+([0-9]+(?:\.[0-9]+)?)/i,
-  ];
 
-  const jsonCondition = (
-    internalKey: string,
-    ruleOperator: string,
-    normalizedOp: string,
-    value: unknown,
-    rightDisplay: string
-  ) => ({
-    field: `$json.${internalKey}`,
-    operator: ruleOperator,
-    value,
-    expression: `{{$json.${internalKey}}} ${normalizedOp} ${rightDisplay}`,
-  });
-
-  for (const pattern of patterns) {
-    const m = canonical.match(pattern);
+  for (const { re, operator, fieldGroup, valueGroup } of IF_ELSE_INTENT_PATTERNS) {
+    const m = canonical.match(re);
     if (!m) continue;
-    const left = normalizeFieldKey(m[1]);
-    const op = m[2].toLowerCase();
-    const rightRaw = m[3];
+
+    const leftRaw = m[fieldGroup].trim();
+    const rightRaw = m[valueGroup].trim();
+    const left = normalizeFieldKey(leftRaw);
     const isNumber = /^[0-9]+(?:\.[0-9]+)?$/.test(rightRaw);
-    const right = isNumber ? rightRaw : `'${normalizeFieldKey(rightRaw)}'`;
-    const { normalizedOp, ruleOperator } = operatorMeta(op);
+    const value = isNumber ? Number(rightRaw) : rightRaw.trim();
+
+    let resolvedOperator = operator;
+    if (operator === '__symbol__') {
+      const sym = m[2];
+      const { ruleOperator } = operatorMeta(sym);
+      resolvedOperator = ruleOperator;
+    } else if (operator === '__word_compare__') {
+      const word = m[2].toLowerCase();
+      const { ruleOperator } = operatorMeta(word);
+      resolvedOperator = ruleOperator;
+    }
+
     const resolved =
       formFields && formFields.length > 0 ? resolveFormFieldKeyForConditionOperand(left, formFields) : null;
-    if (resolved) {
-      return [
-        jsonCondition(
-          resolved,
-          ruleOperator,
-          normalizedOp,
-          isNumber ? Number(rightRaw) : normalizeFieldKey(rightRaw),
-          right
-        ),
-      ];
-    }
-    return [
-      {
-        field: `input.${left}`,
-        operator: ruleOperator,
-        value: isNumber ? Number(rightRaw) : normalizeFieldKey(rightRaw),
-        expression: `{{input.${left}}} ${normalizedOp} ${right}`,
-      },
-    ];
+    const fieldPath = resolved ? `$json.${resolved}` : `$json.${left}`;
+
+    return [{ field: fieldPath, operator: resolvedOperator, value }];
   }
 
   return [];

@@ -388,7 +388,7 @@ export async function runPropertyPopulationStage(
         'Given a user\'s intent, a workflow blueprint, and a node\'s input schema, return a JSON object with values for the specified fields.\n' +
         'CRITICAL RULES FOR CONTROL FLOW NODES:\n' +
         '- if_else nodes: "conditions" MUST be a non-empty array of objects: [{ "field": "$json.<key>", "operator": "<op>", "value": "<val>" }]\n' +
-        '  Valid operators: equals, not_equals, greater_than, less_than, greater_than_or_equal, less_than_or_equal, contains, not_contains, starts_with, ends_with\n' +
+        '  Valid operators (ONLY these 8): equals, not_equals, greater_than, less_than, greater_than_or_equal, less_than_or_equal, contains, not_contains\n' +
         '  NEVER return conditions: [] — an empty array will break the workflow branch.\n' +
         '- switch nodes: "expression" MUST be {{$json.<routingField>}} referencing the upstream field that drives branching.\n' +
         '  "cases" MUST be a non-empty array of objects: [{ "value": "<case_value>", "label": "<Human Label>" }]\n' +
@@ -435,9 +435,14 @@ export async function runPropertyPopulationStage(
         upstreamFormFieldsHint +=
           `\nREQUIRED FORMAT for "conditions" field (return this exact structure):\n` +
           `  [{ "field": "$json.<fieldKey>", "operator": "<operator>", "value": "<compareValue>" }]\n` +
-          `  Valid operators: equals, not_equals, greater_than, less_than, greater_than_or_equal, less_than_or_equal, contains, not_contains, starts_with, ends_with\n` +
-          `  Example: [{ "field": "$json.status", "operator": "equals", "value": "approved" }]\n` +
-          `  CRITICAL: DO NOT return an empty array []. You MUST produce at least one condition derived from the user's intent.\n`;
+          `  Valid operators (ONLY these 8): equals, not_equals, greater_than, less_than, greater_than_or_equal, less_than_or_equal, contains, not_contains\n` +
+          `  DO NOT use starts_with, ends_with, or any other operator — they are invalid and will break execution.\n` +
+          `  Examples:\n` +
+          `    [{ "field": "$json.status", "operator": "equals", "value": "approved" }]\n` +
+          `    [{ "field": "$json.email", "operator": "contains", "value": "urgent" }]\n` +
+          `    [{ "field": "$json.amount", "operator": "greater_than", "value": 100 }]\n` +
+          `  CRITICAL: DO NOT return an empty array []. You MUST produce at least one condition.\n` +
+          `  CRITICAL: The "value" for string checks must be a plain string. For numbers use a number (no quotes).\n`;
       }
 
       // ── For switch nodes: inject routing field context and cases format ────

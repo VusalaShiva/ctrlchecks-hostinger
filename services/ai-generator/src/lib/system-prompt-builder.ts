@@ -153,6 +153,7 @@ DAG STRUCTURAL CONSTRAINTS - YOU MUST ENFORCE ALL OF THESE:
 7. LINEAR BY DEFAULT: Unless the user explicitly requests branching/conditions, use a strictly linear chain: trigger -> node1 -> node2 -> ... -> terminal.
 8. EVERY EDGE MUST CONNECT CONSECUTIVE NODES: In a linear chain, each edge connects node[i] to node[i+1]. No skipping nodes.
 9. COMPLETE COVERAGE: The orderedNodes list and the edges list must be consistent - every node in orderedNodes must appear in at least one edge (as source or target), except the trigger (source only) and terminal (target only).
+10. IF_ELSE CONDITIONS ARE MANDATORY: Every if_else node MUST have a non-empty conditions array set at build time. Valid operators: equals, not_equals, greater_than, less_than, greater_than_or_equal, less_than_or_equal, contains, not_contains. The conditions field CANNOT be deferred to runtime. Example: [{ "field": "$json.status", "operator": "equals", "value": "approved" }]
 `.trim();
 
 /**

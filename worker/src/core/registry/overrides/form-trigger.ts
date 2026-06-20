@@ -8,6 +8,41 @@
 import type { UnifiedNodeDefinition } from '../../types/unified-node-contract';
 import type { NodeSchema } from '../../../services/nodes/node-library';
 
+/** Meta keys that carry submission envelope metadata, not user field values. */
+const FORM_META_KEYS = new Set([
+  '_form', '_chat', 'nodeId', 'submitted_at', 'form', 'data', 'files', 'meta', 'trigger',
+]);
+
+/**
+ * Normalize a form submission input into a clean field-value map.
+ *
+ * Handles two input shapes:
+ *  - trigger-service: { _form: true, nodeId, email, data: { email } }
+ *  - local form-trigger resume: { submitted_at, form: {...}, data: { email } }
+ *
+ * Returns the `data` sub-object when non-empty, otherwise extracts
+ * top-level keys excluding meta/envelope keys.
+ */
+export function normalizeFormTriggerOutput(input: unknown): Record<string, unknown> {
+  if (typeof input !== 'object' || input === null) return {};
+  const obj = input as Record<string, unknown>;
+
+  // Prefer explicit data sub-object when non-empty
+  if (obj.data && typeof obj.data === 'object' && obj.data !== null) {
+    const dataObj = obj.data as Record<string, unknown>;
+    if (Object.keys(dataObj).length > 0) return dataObj;
+  }
+
+  // Fall back: extract top-level user fields, excluding meta keys and _-prefixed keys
+  const result: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (!FORM_META_KEYS.has(k) && !k.startsWith('_')) {
+      result[k] = v;
+    }
+  }
+  return result;
+}
+
 export function overrideFormTrigger(
   def: UnifiedNodeDefinition,
   schema: NodeSchema
@@ -116,11 +151,9 @@ export function overrideFormTrigger(
         ? input as Record<string, unknown>
         : {};
       
-      // ✅ OPTIMIZED: Form trigger - return clean form data
-      // This matches the Form node implementation - return clean form data
       return {
         success: true,
-        output: inputObj.data || {},
+        output: normalizeFormTriggerOutput(inputObj),
       };
     },
   };

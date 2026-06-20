@@ -19676,10 +19676,10 @@ export default async function executeWorkflowHandler(req: Request, res: Response
       // Detect form submission resume: check if input has form submission structure
       // OR if waiting_for_node_id is set (for backward compatibility)
       // OR if status is "running" with form data (form was just submitted)
-      const hasFormSubmissionData = execData?.input && 
-        typeof execData.input === 'object' && 
+      const hasFormSubmissionData = execData?.input &&
+        typeof execData.input === 'object' &&
         execData.input !== null &&
-        ('form' in execData.input || 'submitted_at' in execData.input);
+        ('form' in execData.input || 'submitted_at' in execData.input || '_form' in execData.input);
       
       const isResumingFromForm = hasFormSubmissionData && 
         (execData?.status === 'running' || execData?.trigger === 'form');
@@ -20157,18 +20157,40 @@ export default async function executeWorkflowHandler(req: Request, res: Response
         // Chat trigger now works like webhook - no pausing, just output the message and continue
         // The chat-trigger.ts API creates a new execution for each message
 
-        if (nodeType === 'form') {
-          // Check if we're resuming and form node output is already set
+        if (nodeType === 'form' || nodeType === 'form_trigger') {
+          // Check if we're resuming and form node output is already set (local resume path)
           const existingFormOutput = nodeOutputs.get(node.id);
           if (existingFormOutput !== undefined) {
             console.log(`[Form Node] Form node output already set (resuming), skipping pause and using existing output`);
-            // Form node output is already set from resume logic, just use it
             log.status = 'success';
             log.finishedAt = new Date().toISOString();
             log.output = existingFormOutput;
             logs.push(log);
             finalOutput = existingFormOutput;
             continue; // Skip to next node
+          }
+
+          // Detect trigger-service path: fresh execution with _form:true or submitted_at+data
+          const inputHasFormSubmissionPayload = (inp: unknown): boolean => {
+            if (typeof inp !== 'object' || inp === null) return false;
+            const o = inp as Record<string, unknown>;
+            if (o._form === true) return true;
+            if (o.submitted_at !== undefined && o.data !== undefined) return true;
+            if (o.data && typeof o.data === 'object' && Object.keys(o.data as object).length > 0) return true;
+            return false;
+          };
+
+          if (inputHasFormSubmissionPayload(executionInput)) {
+            const { normalizeFormTriggerOutput } = await import('../core/registry/overrides/form-trigger');
+            const formOutput = normalizeFormTriggerOutput(executionInput);
+            console.log(`[Form Node] Submission payload detected in execution input (trigger-service path), skipping pause. Output keys: ${Object.keys(formOutput).join(', ') || '(none)'}`);
+            log.status = 'success';
+            log.finishedAt = new Date().toISOString();
+            log.output = formOutput;
+            logs.push(log);
+            finalOutput = formOutput;
+            nodeOutputs.set(node.id, formOutput);
+            continue; // Skip pause → downstream nodes receive form data
           }
           
           console.log(`[Form Node] Detected form node: ${node.id}, pausing execution...`);
@@ -20596,6 +20618,34 @@ export default async function executeWorkflowHandler(req: Request, res: Response
           } catch (_e) { /* best-effort — never block execution for cache */ }
 
           finalOutput = output;
+
+          // Fix C: Fail closed when a form/webhook trigger produces null/undefined output
+          // while downstream nodes exist (prevents silent stall on misconfigured triggers).
+          if (
+            (nodeType === 'form' || nodeType === 'form_trigger') &&
+            (output === null || output === undefined) &&
+            i < executionOrder.length - 1
+          ) {
+            const { isEffectivelyEmptyUpstreamPayload } = await import('../core/utils/upstream-payload-signal');
+            if (isEffectivelyEmptyUpstreamPayload(output)) {
+              const errMsg = `${node.data?.label || nodeType} produced no output; downstream nodes cannot execute`;
+              log.status = 'failed';
+              log.finishedAt = new Date().toISOString();
+              log.error = errMsg;
+              logs.push(log);
+              hasError = true;
+              errorMessage = errMsg;
+              await db.from('executions').update({
+                status: 'error',
+                finished_at: new Date().toISOString(),
+                error: errMsg,
+                logs,
+              }).eq('id', executionId).catch(() => {});
+              const { releaseExecutionLock: relLock } = await import('../services/execution/execution-lock');
+              await relLock(db, workflowId, executionId).catch(() => {});
+              return res.status(200).json({ success: false, error: errMsg, executionId });
+            }
+          }
 
           // CRITICAL: Auto-forward AI agent responses to chat UI
           // Check if this is an AI agent node with a response and if workflow has chat trigger

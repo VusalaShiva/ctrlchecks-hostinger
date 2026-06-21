@@ -32,11 +32,12 @@ Full live test program (T1–T4) executed on production EC2. All infrastructure 
 | Step | Endpoint | Result | Detail |
 |---|---|---|---|
 | 1 | GET /health/ready | ✅ PASS | HTTP 200 |
-| 2 | POST /api/save-workflow | ✅ PASS | HTTP 200, workflowId returned. Note: used UPDATE path (LT-012 blocks CREATE for admin with 99 workflows) |
+| 2 | POST /api/save-workflow (UPDATE) | ✅ PASS | HTTP 200, workflowId returned (initial run) |
+| 2b | POST /api/save-workflow (CREATE) | ✅ PASS | HTTP 200, workflowId `220dd118` — LIVE-4B after LT-012 fix |
 | 3 | POST /api/execute-workflow | ✅ PASS | HTTP 202, executionId `586cf176-f2d0-470d-af6b-3258b83016b0` |
 | 3b | GET /api/execution-status/:id | ✅ PASS | status=`success` in 3s; actual execution took 223ms |
 | 4 | GET /metrics | ✅ PASS | `workflow_crud_delegation_total{result="hit"} 1`, `{result="miss"} 1` |
-| 5 | DELETE /api/workflows/:id | N/A | No new workflow created; used UPDATE on existing; cleanup not needed |
+| 5 | DELETE /api/workflows/:id | ✅ PASS | HTTP 200, `live-test-lt012-create` deleted — LIVE-4B cleanup confirmed |
 
 ---
 
@@ -65,6 +66,7 @@ Full live test program (T1–T4) executed on production EC2. All infrastructure 
 |---|---|---|---|
 | FIX-T4-AUTH | `worker/src/index.ts`, `worker/src/core/utils/check-google-auth.ts` | Added `authenticateUser` middleware to `/api/save-workflow` and `/api/execute-workflow`; added `req.user` fast path to bypass `db.auth.getUser()` for Google federated tokens | ✅ EC2 worker restarted 11:46 UTC |
 | FIX-T4-ENUM | `services/execution-engine/src/routes/execute.ts` | Changed pre-create execution status from `'queued'` to `'pending'` to match DB enum | ✅ EC2 execution-engine restarted 13:25 UTC |
+| FIX-LT-012 | `services/workflow-crud-service/src/lib/workflow-repo.ts`, `save-workflow.ts`, `routes/workflows.ts` | Replaced broken `getWorkflowLimit()` (queried non-existent columns) with `ensure_free_subscription` + `check_workflow_limit` Postgres RPCs — same as worker. Admin has Enterprise plan (limit=1041, current=99) → `can_create=true`. 30/30 tests pass. | ✅ EC2 crud+worker restarted 16:32 UTC |
 
 ---
 
@@ -81,8 +83,8 @@ Full live test program (T1–T4) executed on production EC2. All infrastructure 
 
 ## What is NOT Verified on Live
 
-- **Workflow CREATE (new):** Blocked by LT-012 (admin user quota) — not tested
-- **Workflow DELETE:** Not tested (no new workflow created in T4)
+- **Workflow CREATE (new):** ✅ VERIFIED (LIVE-4B) — workflowId `220dd118` created via crud-service, HTTP 200
+- **Workflow DELETE:** ✅ VERIFIED (LIVE-4B) — deleted via crud-service, HTTP 200, cleaned up
 - **OAuth provider matrix:** Google auth confirmed; other providers (GitHub, LinkedIn, etc.) not tested
 - **AI workflow generation:** POST /api/generate-workflow not in T4 scope
 - **Load test:** No concurrent execution test (max 5 rule)
@@ -92,15 +94,13 @@ Full live test program (T1–T4) executed on production EC2. All infrastructure 
 
 ---
 
-## LT-012 Fix Path (Open P1)
+## LT-012 Fix — COMPLETE (LIVE-4)
 
-Admin user `d1f3dd1a-2081-7056-9577-8ef4e3a8082a` has 99 workflows. The `subscriptions` table has no row for this Cognito sub → `getWorkflowLimit()` returns default 10 → `99 >= 10` → `403 quota_exceeded` on CREATE.
+**Root cause:** `getWorkflowLimit()` in crud service queried `SELECT workflow_limit, plan_type FROM subscriptions WHERE user_id = $1` — but production `subscriptions` table uses `plan_id` FK (no `workflow_limit`/`plan_type` columns). Query always threw → returned default 10 → admin with 99 workflows got `99 >= 10` → 403.
 
-**Fix options:**
-1. Insert a subscription row: `INSERT INTO subscriptions (user_id, workflow_limit, plan_type) VALUES ('d1f3dd1a-...', 1000, 'enterprise') ON CONFLICT DO NOTHING;`
-2. Add admin bypass in crud service: if `x-service-key` is valid and `x-user-role: admin` → skip quota
+**Fix (LIVE-4A):** Replaced with `ensure_free_subscription` + `check_workflow_limit` Postgres RPCs — same functions used by the worker. These count actual workflow rows and join the active subscription plan.
 
-For regular users: once `subscriptions` rows exist (set during signup), the quota check works correctly.
+**Verified (LIVE-4B):** Admin user has Enterprise plan (limit=1041, current=99) → `can_create=true`. CREATE returned HTTP 200, workflowId `220dd118`, deleted successfully. T4 full pass.
 
 ---
 

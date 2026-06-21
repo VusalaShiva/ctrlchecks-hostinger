@@ -15,9 +15,9 @@ import {
   getWorkflowByIdForOwnerCheck,
   insertWorkflow,
   updateWorkflow,
-  countWorkflowsByUser,
-  getWorkflowLimit,
   insertVersionSnapshot,
+  ensureFreeSubscription,
+  checkWorkflowLimit,
   WorkflowRow,
 } from './workflow-repo';
 
@@ -99,19 +99,22 @@ export async function saveWorkflow(input: SaveWorkflowInput): Promise<SaveResult
     }
     previousWorkflow = await getWorkflowById(workflowId, userId).catch(() => null);
   } else {
-    // CREATE — check quota
-    const [used, limit] = await Promise.all([
-      countWorkflowsByUser(userId).catch(() => 0),
-      getWorkflowLimit(userId).catch(() => 10),
-    ]);
-    if (used >= limit) {
+    // CREATE — ensure subscription exists, then check quota via DB RPCs (same as worker)
+    await ensureFreeSubscription(userId);
+    const quota = await checkWorkflowLimit(userId);
+    if (!quota.canCreate) {
       return {
         ok: false,
         httpStatus: 403,
         error: {
           type: 'quota_exceeded',
-          message: `You've reached your workflow limit (${limit}). Upgrade your plan to create more workflows.`,
-          details: { workflowsUsed: used, workflowLimit: limit, upgradeUrl: '/subscriptions' },
+          message: `You've reached your workflow limit (${quota.limitCount}). Upgrade your plan to create more workflows.`,
+          details: {
+            workflowsUsed: quota.currentCount,
+            workflowLimit: quota.limitCount,
+            planName: quota.planName,
+            upgradeUrl: '/subscriptions',
+          },
         },
       };
     }

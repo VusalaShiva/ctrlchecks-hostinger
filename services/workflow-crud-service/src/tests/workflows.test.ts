@@ -154,10 +154,10 @@ describe('POST /workflows', () => {
   });
 
   it('returns 403 when user quota is exceeded (CREATE)', async () => {
-    // count query → 10 workflows (at limit), limit → 10
+    // ensureFreeSubscription → no-op success, checkWorkflowLimit → at limit
     mockQueryDb
-      .mockResolvedValueOnce([{ count: '10' }])  // countWorkflowsByUser
-      .mockResolvedValueOnce([{ workflow_limit: 10 }]); // getWorkflowLimit
+      .mockResolvedValueOnce([]) // ensureFreeSubscription
+      .mockResolvedValueOnce([{ can_create: false, current_count: 10, limit_count: 10, plan_name: 'Free' }]); // checkWorkflowLimit
 
     const res = await withUser(request(app).post('/workflows')).send({
       name: 'Over Limit',
@@ -170,8 +170,8 @@ describe('POST /workflows', () => {
 
   it('creates a new workflow successfully (INSERT path)', async () => {
     mockQueryDb
-      .mockResolvedValueOnce([{ count: '2' }])   // countWorkflowsByUser
-      .mockResolvedValueOnce([{ workflow_limit: 10 }]) // getWorkflowLimit
+      .mockResolvedValueOnce([]) // ensureFreeSubscription
+      .mockResolvedValueOnce([{ can_create: true, current_count: 2, limit_count: 10, plan_name: 'Free' }]) // checkWorkflowLimit
       .mockResolvedValueOnce([SAVED_WF_ROW])     // insertWorkflow RETURNING *
       .mockResolvedValueOnce([{ max: null }])    // version snapshot max version
       .mockResolvedValueOnce([]);               // version snapshot insert
@@ -241,8 +241,8 @@ describe('POST /workflows', () => {
   it('deduplicates duplicate node IDs before saving', async () => {
     const dupNodes = [...VALID_NODES, { ...VALID_NODES[0] }]; // duplicate trigger
     mockQueryDb
-      .mockResolvedValueOnce([{ count: '0' }])
-      .mockResolvedValueOnce([{ workflow_limit: 10 }])
+      .mockResolvedValueOnce([]) // ensureFreeSubscription
+      .mockResolvedValueOnce([{ can_create: true, current_count: 0, limit_count: 10, plan_name: 'Free' }]) // checkWorkflowLimit
       .mockResolvedValueOnce([SAVED_WF_ROW])
       .mockResolvedValueOnce([{ max: null }])
       .mockResolvedValueOnce([]);
@@ -265,8 +265,8 @@ describe('POST /workflows', () => {
       { id: 'e-dangling', source: 'trigger-1', target: 'ghost-node' },
     ];
     mockQueryDb
-      .mockResolvedValueOnce([{ count: '0' }])
-      .mockResolvedValueOnce([{ workflow_limit: 10 }])
+      .mockResolvedValueOnce([]) // ensureFreeSubscription
+      .mockResolvedValueOnce([{ can_create: true, current_count: 0, limit_count: 10, plan_name: 'Free' }]) // checkWorkflowLimit
       .mockResolvedValueOnce([SAVED_WF_ROW])
       .mockResolvedValueOnce([{ max: null }])
       .mockResolvedValueOnce([]);

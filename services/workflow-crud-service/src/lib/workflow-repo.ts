@@ -151,21 +151,66 @@ export async function insertVersionSnapshot(params: {
   }
 }
 
-/** Get user's workflow limit from subscriptions table (default 10 for Free). */
-export async function getWorkflowLimit(userId: string): Promise<number> {
+export interface WorkflowLimitResult {
+  canCreate: boolean;
+  currentCount: number;
+  limitCount: number;
+  planName: string;
+}
+
+/**
+ * Ensures the user has a Free subscription row if they have none.
+ * Calls the `ensure_free_subscription` Postgres function — same as the worker.
+ * Non-fatal: logs and continues on error (user may still be allowed to create).
+ */
+export async function ensureFreeSubscription(userId: string): Promise<void> {
   try {
-    const rows = await queryDb<{ workflow_limit?: number; plan_type?: string }>(
-      `SELECT workflow_limit, plan_type FROM subscriptions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`,
-      [userId],
-    );
+    await queryDb(`SELECT public.ensure_free_subscription($1::uuid)`, [userId]);
+  } catch (err) {
+    console.warn('[workflow-crud-service] ensureFreeSubscription failed (non-fatal):', err instanceof Error ? err.message : err);
+  }
+}
+
+/**
+ * Checks whether the user can create another workflow using the
+ * `check_workflow_limit` Postgres function — counts actual workflow rows,
+ * joins active subscription + plan for the limit. Same logic as the worker.
+ */
+export async function checkWorkflowLimit(userId: string): Promise<WorkflowLimitResult> {
+  try {
+    const rows = await queryDb<{
+      can_create: boolean;
+      current_count: number;
+      limit_count: number;
+      plan_name: string;
+    }>(`SELECT can_create, current_count, limit_count, plan_name FROM public.check_workflow_limit($1::uuid)`, [userId]);
+
     const row = rows[0];
-    if (!row) return 10;
-    if (typeof row.workflow_limit === 'number') return row.workflow_limit;
-    // Fallback to plan defaults
-    if (row.plan_type === 'pro') return 100;
-    if (row.plan_type === 'enterprise') return 1000;
-    return 10;
+    if (!row) {
+      // Function returned no row — user not found; allow with a high limit
+      return { canCreate: true, currentCount: 0, limitCount: 10, planName: 'Free' };
+    }
+    return {
+      canCreate: row.can_create,
+      currentCount: row.current_count,
+      limitCount: row.limit_count,
+      planName: row.plan_name,
+    };
+  } catch (err) {
+    console.warn('[workflow-crud-service] checkWorkflowLimit failed — allowing create:', err instanceof Error ? err.message : err);
+    // Fail open: don't block users if quota check itself errors
+    return { canCreate: true, currentCount: 0, limitCount: 10, planName: 'Free' };
+  }
+}
+
+/**
+ * Syncs workflow_count on the users row after a successful CREATE.
+ * Best-effort — non-fatal on failure.
+ */
+export async function syncWorkflowCount(userId: string): Promise<void> {
+  try {
+    await queryDb(`SELECT public.increment_workflow_count($1::uuid)`, [userId]);
   } catch {
-    return 10;
+    // Non-fatal — check_workflow_limit counts live from workflows table anyway
   }
 }

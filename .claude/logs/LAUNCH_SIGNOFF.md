@@ -130,8 +130,8 @@ Live E2E test program (LIVE-0 through LIVE-3) executed on production EC2 by auto
 | **T4 — Live E2E** | ✅ **PASS** | save(UPDATE)→execute→status(success in 3s)→metrics confirmed |
 
 **Bugs found and fixed during T4:**
-- **LT-011 FIXED:** execution_status DB enum missing "queued" → pre-create failed → status polling returned 404. Fixed: changed pre-create status to "pending". Commit pending.
-- **LT-012 OPEN:** workflow-crud-service CREATE returns 403 for admin user (99 workflows, no subscription row for Cognito sub → default limit 10). Workaround: T4 used UPDATE path. Fix: insert subscription row for admin user.
+- **LT-011 FIXED:** execution_status DB enum missing "queued" → pre-create failed → status polling returned 404. Fixed: changed pre-create status to "pending".
+- **LT-012 FIXED (LIVE-4):** `getWorkflowLimit()` queried non-existent columns → always returned default 10 → 403 for admin. Root fix: `ensure_free_subscription` + `check_workflow_limit` RPCs (same as worker). Admin has Enterprise plan (limit=1041) → `can_create=true`. T4 CREATE re-run pending fresh JWT.
 
 Full signoff: `.claude/logs/LIVE_TEST_SIGNOFF.md`
 

@@ -3,6 +3,7 @@
  *
  * Phase 2: real fetch, canary routing, shouldUseCredentialService.
  */
+export {};
 
 const mockFetch = jest.fn();
 global.fetch = mockFetch as unknown as typeof fetch;

@@ -7,6 +7,7 @@
  *   - Happy path (returns ExecuteResponse, correct headers)
  *   - Canary: isCanaryTarget() — deterministic 33% distribution
  */
+export {};
 
 const mockFetch = jest.fn();
 global.fetch = mockFetch as unknown as typeof fetch;

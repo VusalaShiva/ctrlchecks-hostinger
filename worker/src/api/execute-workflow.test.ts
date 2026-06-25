@@ -91,7 +91,7 @@ function makeRes(): { status: jest.Mock; json: jest.Mock; res: Partial<Response>
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('executeWorkflowHandler — input validation', () => {
-  let handler: (req: Request, res: Response) => Promise<void>;
+  let handler: (req: Request, res: Response) => Promise<any>;
 
   beforeAll(async () => {
     // Import after mocks are registered

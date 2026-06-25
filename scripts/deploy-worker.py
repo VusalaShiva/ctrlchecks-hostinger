@@ -17,6 +17,9 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='repla
 
 import paramiko
 
+# On Windows, npm/node are .cmd shims — subprocess needs shell=True to find them.
+IS_WIN = sys.platform == "win32"
+
 HOST = "187.127.185.105"
 USER = "root"
 PASS = os.environ.get("DEPLOY_PASS", "")
@@ -30,17 +33,22 @@ REPO_ROOT = pathlib.Path(__file__).parent.parent
 WORKER_DIR = REPO_ROOT / "worker"
 
 # ── Build ───────────────────────────────────────────────────────────────────
+def npm(args, **kwargs):
+    """Run an npm command, using shell=True on Windows so .cmd shims are found."""
+    cmd = ["npm"] + args if not IS_WIN else " ".join(["npm"] + args)
+    return subprocess.run(cmd, shell=IS_WIN, check=True, **kwargs)
+
 print("▶ Type-checking worker...")
-subprocess.run(["npm", "run", "type-check"], cwd=WORKER_DIR, check=True)
+npm(["run", "type-check"], cwd=WORKER_DIR)
 print("✅ Type-check passed")
 
 print("▶ Linting worker...")
-subprocess.run(["npm", "run", "lint"], cwd=WORKER_DIR, check=True)
+npm(["run", "lint"], cwd=WORKER_DIR)
 print("✅ Lint passed")
 
 print("▶ Building worker...")
 env = {**os.environ, "NODE_OPTIONS": "--max-old-space-size=4096"}
-subprocess.run(["npm", "run", "build"], cwd=WORKER_DIR, check=True, env=env)
+npm(["run", "build"], cwd=WORKER_DIR, env=env)
 print("✅ Build complete")
 
 # ── Package ─────────────────────────────────────────────────────────────────
@@ -73,6 +81,8 @@ ssh.connect(
     disabled_algorithms={"pubkeys": ["rsa-sha2-256", "rsa-sha2-512"]},
     banner_timeout=20,
 )
+# Keep-alive every 10s — prevents Hostinger from dropping the connection during large SFTP uploads
+ssh.get_transport().set_keepalive(10)
 print("✅ SSH connected")
 
 def run(cmd, desc, timeout=180):

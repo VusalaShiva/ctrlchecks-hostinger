@@ -771,13 +771,35 @@ export class UnifiedNodeRegistry implements INodeRegistry {
     }
 
     // Extract output schema
+    // schema.outputSchema can be either:
+    //   (a) a flat field-dict  { fieldName: { type, description } }  — use directly as properties
+    //   (b) NodeOutputSchema   { type, structure: { fields }, itemType, convertible, … }  — extract structure.fields
+    //   (c) undefined / {}     — fall back to empty properties
+    const NOS_RESERVED = new Set(['type', 'structure', 'itemType', 'convertible', 'defaultValue']);
+    const extractProperties = (raw: any): Record<string, any> => {
+      if (!raw || typeof raw !== 'object') return {};
+      if (raw.structure?.fields && typeof raw.structure.fields === 'object') {
+        // NodeOutputSchema with named fields — lift them into a flat dict
+        const props: Record<string, any> = {};
+        for (const [name, type] of Object.entries(raw.structure.fields)) {
+          props[name] = { type };
+        }
+        return props;
+      }
+      // Flat field-dict: at least one key is NOT a NodeOutputSchema reserved key
+      if (Object.keys(raw).some(k => !NOS_RESERVED.has(k))) {
+        return raw;
+      }
+      return {};
+    };
+    const rawOutputType = (schema.outputType || (schema.outputSchema as any)?.type || 'object') as 'string' | 'number' | 'boolean' | 'object' | 'array';
     const outputSchema: NodeOutputSchema = {
       default: {
         name: 'default',
         description: 'Default output port',
         schema: {
-          type: schema.outputType || 'object',
-          properties: schema.outputSchema || {},
+          type: rawOutputType,
+          properties: extractProperties(schema.outputSchema),
         },
       },
     };

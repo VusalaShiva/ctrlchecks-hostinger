@@ -244,6 +244,70 @@ jobs:
           echo "Response: $BODY"
           echo "$BODY" | grep -q '"status":"live"'
 
+  worker-openapi-validate:
+    name: Worker OpenAPI Spec Validate
+    runs-on: ubuntu-latest
+    needs: worker-build
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./worker
+        run: npm ci
+
+      - name: Build (generates public/openapi.json)
+        working-directory: ./worker
+        run: npm run build
+
+      - name: Validate openapi.json exists and is valid JSON
+        working-directory: ./worker
+        run: |
+          test -f public/openapi.json || (echo "public/openapi.json missing" && exit 1)
+          node -e "
+            const spec = require('./public/openapi.json');
+            if (spec.openapi !== '3.0.3') { console.error('openapi field wrong:', spec.openapi); process.exit(1); }
+            const paths = Object.keys(spec.paths || {});
+            if (paths.length < 10) { console.error('Too few paths:', paths.length); process.exit(1); }
+            console.log('openapi.json OK — version:', spec.info.version, '— paths:', paths.length);
+          "
+
+      - name: Start worker and assert /api/docs returns 401 without JWT
+        working-directory: ./worker
+        env:
+          NODE_ENV: production
+          PORT: 3001
+          DATABASE_URL: postgresql://smoke:smoke@localhost:5432/smoke
+          REDIS_URL: redis://localhost:6379
+          COGNITO_USER_POOL_ID: ap-south-1_smoketest
+          COGNITO_CLIENT_ID: smokeclientid
+          COGNITO_ISSUER: https://cognito-idp.ap-south-1.amazonaws.com/ap-south-1_smoketest
+          COGNITO_DOMAIN: smoke.auth.ap-south-1.amazoncognito.com
+          GEMINI_API_KEY: smoke-key-not-used
+          LOG_LEVEL: warn
+        run: |
+          node dist/index.js &
+          for i in $(seq 1 15); do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/health/live)
+            [ "$CODE" = "200" ] && break
+            sleep 2
+          done
+          # /api/docs without JWT must return 401 (Cognito gate)
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/api/docs)
+          echo "/api/docs (no JWT): HTTP $CODE"
+          [ "$CODE" = "401" ] || (echo "Expected 401, got $CODE" && exit 1)
+          # /api/docs/openapi.json without JWT must also return 401
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/api/docs/openapi.json)
+          echo "/api/docs/openapi.json (no JWT): HTTP $CODE"
+          [ "$CODE" = "401" ] || (echo "Expected 401, got $CODE" && exit 1)
+          echo "✅ Both doc endpoints correctly return 401 without JWT"
+
   # ── Worker: smoke tests (mocked — no live RDS/Cognito/EC2) ────────────────
   #
   # Three sub-jobs mirror the T3 live-test tiers (T3a/b/c) but run entirely

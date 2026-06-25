@@ -1376,6 +1376,8 @@ export class NodeLibrary {
     // PHASE 6: Automatically add output type information
     if (!schema.outputType) {
       schema.outputType = getNodeOutputType(schema.type);
+    }
+    if (!schema.outputSchema) {
       schema.outputSchema = getNodeOutputSchema(schema.type);
     }
     
@@ -1860,6 +1862,15 @@ export class NodeLibrary {
           errorMessage: 'URL must be valid or an expression',
         },
       ],
+      outputType: 'object',
+      outputSchema: {
+        status: { type: 'number', description: 'HTTP response status code (200, 404, etc.)' },
+        statusText: { type: 'string', description: 'HTTP status message (OK, Not Found, etc.)' },
+        headers: { type: 'object', description: 'Response headers as key-value pairs' },
+        body: { type: 'object', description: 'Parsed response body (JSON) or raw text' },
+        data: { type: 'object', description: 'Alias for body — the response payload' },
+        responseTime: { type: 'number', description: 'Request duration in milliseconds' },
+      },
     };
   }
 
@@ -2362,6 +2373,15 @@ export class NodeLibrary {
         outputType: 'array', // Produces array of rows
         acceptsArray: false,
         producesArray: true,
+      },
+      outputType: 'array',
+      outputSchema: {
+        values: { type: 'array', description: 'Array of row objects from the spreadsheet' },
+        rowCount: { type: 'number', description: 'Number of rows returned' },
+        sheetName: { type: 'string', description: 'Name of the sheet that was accessed' },
+        spreadsheetId: { type: 'string', description: 'ID of the spreadsheet' },
+        updatedRange: { type: 'string', description: 'A1 notation of the range affected (write/append operations)' },
+        updatedRows: { type: 'number', description: 'Number of rows updated (write/append operations)' },
       },
     };
   }
@@ -4155,6 +4175,14 @@ export class NodeLibrary {
         outputType: 'text', // Produces text confirmation
         acceptsArray: false,
         producesArray: false,
+      },
+      outputType: 'object',
+      outputSchema: {
+        ok: { type: 'boolean', description: 'Whether the message was sent successfully' },
+        channel: { type: 'string', description: 'Channel the message was sent to' },
+        ts: { type: 'string', description: 'Slack message timestamp (unique message ID)' },
+        messageId: { type: 'string', description: 'Unique identifier for the sent message' },
+        success: { type: 'boolean', description: 'Success flag for the send operation' },
       },
     };
   }
@@ -7230,6 +7258,13 @@ export class NodeLibrary {
       },
       commonPatterns: [],
       validationRules: [],
+      outputType: 'object',
+      outputSchema: {
+        result: { type: 'number', description: 'The computed mathematical result' },
+        expression: { type: 'string', description: 'The expression or operation that was evaluated' },
+        operation: { type: 'string', description: 'The math operation performed (add, subtract, multiply, etc.)' },
+        success: { type: 'boolean', description: 'Whether the calculation succeeded' },
+      },
     };
   }
 

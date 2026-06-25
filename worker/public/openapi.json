@@ -1,0 +1,780 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "CtrlChecks Workflow Engine API",
+    "version": "1.0.0",
+    "description": "REST API for the CtrlChecks workflow automation engine. All /api/* endpoints (except health) require a Cognito JWT in the Authorization header.",
+    "contact": {
+      "email": "helloclaude21@gmail.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://worker.ctrlchecks.com",
+      "description": "Production (Hostinger)"
+    },
+    {
+      "url": "http://localhost:3001",
+      "description": "Local development"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "cognitoJwt": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "AWS Cognito ID token obtained via Amplify sign-in."
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "WorkflowNode": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "example": "http_request"
+          },
+          "label": {
+            "type": "string"
+          },
+          "config": {
+            "type": "object"
+          },
+          "position": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      },
+      "WorkflowEdge": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "sourceHandle": {
+            "type": "string"
+          },
+          "targetHandle": {
+            "type": "string"
+          }
+        }
+      },
+      "Workflow": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkflowNode"
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkflowEdge"
+            }
+          },
+          "userId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ExecutionResult": {
+        "type": "object",
+        "properties": {
+          "executionId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "completed",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "outputs": {
+            "type": "object"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "cognitoJwt": []
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Full health check",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Service healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "checks": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/live": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Liveness probe",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "{\"status\":\"live\"}",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "live"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Readiness probe — checks DB + Redis connectivity",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Service ready"
+          },
+          "503": {
+            "description": "Service not ready"
+          }
+        }
+      }
+    },
+    "/api/auth/status": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Get current auth status and user info",
+        "responses": {
+          "200": {
+            "description": "Auth status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "authenticated": {
+                      "type": "boolean"
+                    },
+                    "userId": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated"
+          }
+        }
+      }
+    },
+    "/api/generate-workflow": {
+      "post": {
+        "tags": [
+          "Workflow Generation"
+        ],
+        "summary": "Generate a workflow from a natural language prompt (Gemini)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "prompt"
+                ],
+                "properties": {
+                  "prompt": {
+                    "type": "string",
+                    "example": "Send a Slack message when a GitHub PR is merged"
+                  },
+                  "sessionId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Generated workflow",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Workflow"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid prompt"
+          },
+          "429": {
+            "description": "Rate limit exceeded (20 req/min)"
+          }
+        }
+      }
+    },
+    "/api/execute-workflow": {
+      "post": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "Execute a workflow synchronously",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "workflow"
+                ],
+                "properties": {
+                  "workflow": {
+                    "$ref": "#/components/schemas/Workflow"
+                  },
+                  "inputs": {
+                    "type": "object",
+                    "description": "Initial input data for the trigger node"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Execution result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid workflow"
+          },
+          "429": {
+            "description": "Rate limit exceeded (60 req/min)"
+          }
+        }
+      }
+    },
+    "/api/execution-status/{executionId}": {
+      "get": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "Get execution status by ID",
+        "parameters": [
+          {
+            "name": "executionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Execution status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Execution not found"
+          }
+        }
+      }
+    },
+    "/api/executions/{executionId}/cancel": {
+      "post": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "Cancel a running execution",
+        "parameters": [
+          {
+            "name": "executionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Execution cancelled"
+          },
+          "404": {
+            "description": "Execution not found"
+          }
+        }
+      }
+    },
+    "/api/save-workflow": {
+      "post": {
+        "tags": [
+          "Workflows"
+        ],
+        "summary": "Save or update a workflow",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "workflow"
+                ],
+                "properties": {
+                  "workflow": {
+                    "$ref": "#/components/schemas/Workflow"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved workflow",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Workflow"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workflows": {
+      "get": {
+        "tags": [
+          "Workflows"
+        ],
+        "summary": "List all workflows for the authenticated user",
+        "responses": {
+          "200": {
+            "description": "Workflow list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Workflow"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workflows/{id}": {
+      "get": {
+        "tags": [
+          "Workflows"
+        ],
+        "summary": "Get a workflow by ID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Workflow",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Workflow"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden — not your workflow"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Workflows"
+        ],
+        "summary": "Delete a workflow",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/api/node-definitions": {
+      "get": {
+        "tags": [
+          "Nodes"
+        ],
+        "summary": "Get all node definitions from the unified registry",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Array of node definitions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/nodes/catalog": {
+      "get": {
+        "tags": [
+          "Nodes"
+        ],
+        "summary": "Node catalog with grouping and metadata",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Catalog grouped by category"
+          }
+        }
+      }
+    },
+    "/api/credential-connections/connections": {
+      "get": {
+        "tags": [
+          "Connections"
+        ],
+        "summary": "List all credential connections for the user",
+        "responses": {
+          "200": {
+            "description": "Connection list"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Connections"
+        ],
+        "summary": "Create a new credential connection",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "type": "string",
+                    "example": "google"
+                  },
+                  "credentials": {
+                    "type": "object"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Connection created"
+          }
+        }
+      }
+    },
+    "/api/credential-connections/connections/{id}": {
+      "put": {
+        "tags": [
+          "Connections"
+        ],
+        "summary": "Update a credential connection",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Connections"
+        ],
+        "summary": "Delete a credential connection",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          }
+        }
+      }
+    },
+    "/api/ai/generate": {
+      "post": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Generate a workflow (AI pipeline, same as /api/generate-workflow)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "prompt"
+                ],
+                "properties": {
+                  "prompt": {
+                    "type": "string"
+                  },
+                  "sessionId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Generated workflow"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
+        }
+      }
+    },
+    "/api/execute-agent": {
+      "post": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Execute an AI agent node with given inputs",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nodeType": {
+                    "type": "string",
+                    "example": "ai_agent"
+                  },
+                  "inputs": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Agent execution result"
+          }
+        }
+      }
+    },
+    "/api/docs/openapi.json": {
+      "get": {
+        "tags": [
+          "Docs"
+        ],
+        "summary": "Download the raw OpenAPI 3.0 spec as JSON",
+        "responses": {
+          "200": {
+            "description": "OpenAPI spec",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    }
+  }
+}

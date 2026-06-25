@@ -177,6 +177,7 @@ import saveWorkflowRoute from './api/save-workflow';
 import { setupDraftWorkflowHandler, commitSetupWorkflowHandler } from './api/workflow-setup-lifecycle';
 import getMissingItemsRoute from './api/workflows-missing-items';
 import configureWorkflowRoute from './api/workflows-configure';
+import { docsRouter } from './api/docs';
 import { confirmWorkflow, rejectWorkflow } from './api/workflow-confirm';
 import { substituteTools, getAvailableSubstitutions } from './api/tool-substitute';
 import { serveChatbotPage } from './api/chatbot-page';
@@ -748,6 +749,9 @@ app.delete('/api/credentials/:key', asyncHandler(authenticateUser), asyncHandler
   
   res.json({ success: true, message: 'Credential deleted' });
 }));
+
+// OpenAPI docs — Cognito-gated (401 without valid JWT)
+app.use('/api/docs', docsRouter);
 
 // ✅ Node Definitions API - Backend is source of truth for node schemas
 import './nodes/definitions'; // Register all node definitions

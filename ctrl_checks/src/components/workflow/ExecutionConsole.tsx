@@ -112,7 +112,7 @@ function buildLogsFromSteps(steps: ExecutionStep[]) {
 }
 
 export default function ExecutionConsole({ isExpanded, onToggle }: ExecutionConsoleProps) {
-  const { workflowId, updateNodeStatus, resetWorkflow, resetAllNodeStatuses, nodes } = useWorkflowStore();
+  const { workflowId, updateNodeStatus, resetWorkflow, resetAllNodeStatuses, nodes, setNodeError, clearNodeErrors } = useWorkflowStore();
   const { activeExecution, reconnecting } = useExecutionStatus();
   const [executions, setExecutions] = useState<Execution[]>([]);
   const [loading, setLoading] = useState(false);
@@ -173,6 +173,9 @@ export default function ExecutionConsole({ isExpanded, onToggle }: ExecutionCons
           };
           if (msg.type === 'NODE_UPDATE' && msg.data?.nodeId) {
             applyNodeState(msg.data.nodeId, msg.data.status);
+            if (msg.data.status === 'error' && msg.data.error) {
+              setNodeError(msg.data.nodeId, String(msg.data.error));
+            }
           } else if (msg.type === 'EXECUTION_SNAPSHOT' && Array.isArray(msg.data?.nodes)) {
             msg.data.nodes.forEach((n: any) => applyNodeState(n.nodeId, n.status));
           }
@@ -487,8 +490,9 @@ export default function ExecutionConsole({ isExpanded, onToggle }: ExecutionCons
               // Add new execution at the beginning, limit to 10
               return [newExecution, ...prev.filter(exec => exec.id !== newExecution.id)].slice(0, 10);
             });
-            // Reset all node statuses when a new execution starts
+            // Reset all node statuses and error messages when a new execution starts
             resetAllNodeStatuses();
+            clearNodeErrors();
             // Reset execution ID tracking to trigger status reset
             setLastExecutionId(null);
             // ✅ FIX: Only auto-select new execution if user hasn't manually selected one

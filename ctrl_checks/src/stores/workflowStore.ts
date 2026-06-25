@@ -109,6 +109,11 @@ interface WorkflowState {
 
   setAiEditedNodeIds: (ids: string[]) => void;
   clearAiEditedNodeHighlight: () => void;
+
+  /** Per-node error messages surfaced from WebSocket NODE_UPDATE events. nodeId → error string. */
+  nodeErrors: Record<string, string>;
+  setNodeError: (nodeId: string, error: string) => void;
+  clearNodeErrors: () => void;
 }
 
 export const useWorkflowStore = create<WorkflowState>((set, get) => ({
@@ -127,6 +132,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   fieldOwnershipOverrides: {},
   undoStack: [],
   redoStack: [],
+  nodeErrors: {},
 
   setNodes: (nodes) => set({ nodes }),
   setEdges: (edges) => set({ edges }),
@@ -389,8 +395,15 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
         }
         return edge;
       }),
+      nodeErrors: {},
     });
   },
+
+  setNodeError: (nodeId, error) => {
+    set((state) => ({ nodeErrors: { ...state.nodeErrors, [nodeId]: error } }));
+  },
+
+  clearNodeErrors: () => set({ nodeErrors: {} }),
 
   selectNode: (node) => {
     const { nodes, edges } = get();

@@ -178,6 +178,7 @@ export default function Connections() {
   const { data: credentialTypes = [], isLoading: credentialTypesLoading } = useCredentialTypes();
   const [searchParams, setSearchParams] = useSearchParams();
   const [connSearch, setConnSearch] = useState('');
+  const [authFilter, setAuthFilter] = useState<'all' | 'oauth' | 'api_key'>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [modalPreset, setModalPreset] = useState<string | undefined>();
   const [editingConnection, setEditingConnection] = useState<ConnectionRecord | null>(null);
@@ -253,13 +254,15 @@ export default function Connections() {
   const visibleConnections = connections;
   const connectedTypeIds = new Set(visibleConnections.map((connection) => connection.credentialTypeId));
 
-  const filteredConns = connSearch.trim()
-    ? visibleConnections.filter(
-        (c) =>
-          c.name.toLowerCase().includes(connSearch.toLowerCase()) ||
-          c.provider.toLowerCase().includes(connSearch.toLowerCase()),
-      )
-    : visibleConnections;
+  const filteredConns = visibleConnections.filter((c) => {
+    if (connSearch.trim()) {
+      const q = connSearch.toLowerCase();
+      if (!c.name.toLowerCase().includes(q) && !c.provider.toLowerCase().includes(q)) return false;
+    }
+    if (authFilter === 'oauth') return c.authType === 'oauth2';
+    if (authFilter === 'api_key') return c.authType !== 'oauth2';
+    return true;
+  });
 
   const grouped = groupByCategory(filteredConns);
   const orderedCategories = CATEGORY_ORDER.filter((cat) => grouped[cat]?.length);
@@ -314,14 +317,32 @@ export default function Connections() {
             </div>
 
             {visibleConnections.length > 0 && (
-              <div className="relative max-w-sm mb-4">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search saved connections…"
-                  className="pl-9"
-                  value={connSearch}
-                  onChange={(e) => setConnSearch(e.target.value)}
-                />
+              <div className="flex flex-wrap items-center gap-3 mb-4">
+                <div className="relative max-w-sm flex-shrink-0">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search saved connections…"
+                    className="pl-9"
+                    value={connSearch}
+                    onChange={(e) => setConnSearch(e.target.value)}
+                  />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {(['all', 'oauth', 'api_key'] as const).map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => setAuthFilter(f)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                        authFilter === f
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-transparent text-muted-foreground border-border hover:border-foreground/40 hover:text-foreground'
+                      }`}
+                    >
+                      {f === 'all' ? 'All' : f === 'oauth' ? 'OAuth' : 'API Key'}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 

@@ -96,10 +96,20 @@ import {
     markAttachInputsPayloadPersisted,
     wasAttachInputsPayloadRecentlyPersisted,
 } from '@/lib/attach-inputs-payload';
-import { findFieldDocField } from '@/lib/field-doc-resolver';
 import { GuidedStatusCard } from '@/components/ui/guided-status-card';
 import { mapWorkflowIssueToGuidance, type GuidedStatusContent } from '@/lib/workflow-guidance';
 import { prepareActionableFieldExample } from '@/lib/actionable-field-example';
+import {
+    partitionValidatedDiscoveredCredentials,
+    partitionValidatedRequiredCredentialStrings,
+} from '@/lib/wizard-credential-validation';
+import {
+    buildFieldOwnershipCopy,
+    humanizeFieldName,
+    findFieldDocForQuestion,
+    type FieldDesc,
+} from '@/lib/wizard-field-ownership';
+import { buildGenerateWorkflowCreateBody, type WizardSelectedVariationMeta } from '@/lib/wizard-generate-body';
 
 /**
  * Ensures proper state transitions before setting workflow blueprint.
@@ -160,81 +170,6 @@ function isPipelineContractReady(data: { phase?: string; success?: boolean } | n
     return (data?.phase === 'ready' || data?.phase === 'complete') && data?.success !== false;
 }
 
-const BACKEND_CREDENTIAL_FIELD_MAX_LEN = 256;
-
-function isNonEmptyTrimmedString(v: unknown): v is string {
-    return typeof v === 'string' && v.trim().length > 0;
-}
-
-/** Block control characters; vault keys never allow newlines. Display names allow newlines for rare multi-line labels. */
-function hasNoDisallowedCredentialChars(s: string, allowNewlines: boolean): boolean {
-    if (allowNewlines) {
-        // eslint-disable-next-line no-control-regex
-        return !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(s);
-    }
-    // eslint-disable-next-line no-control-regex
-    return !/[\r\n\x00-\x1f]/.test(s);
-}
-
-/**
- * Second-pass validation for `discoveredCredentials` rows from the backend.
- * Invalid rows are omitted (no throw); callers should toast `invalidCount` if it is positive.
- */
-function partitionValidatedDiscoveredCredentials(rows: unknown): { validRows: any[]; invalidCount: number } {
-    if (!Array.isArray(rows)) return { validRows: [], invalidCount: 0 };
-    const validRows: any[] = [];
-    let invalidCount = 0;
-    for (const cred of rows) {
-        if (!cred || typeof cred !== 'object') {
-            invalidCount++;
-            continue;
-        }
-        const c = cred as Record<string, unknown>;
-        const hasVk = isNonEmptyTrimmedString(c.vaultKey);
-        const hasDn = isNonEmptyTrimmedString(c.displayName);
-        if (!hasVk && !hasDn) {
-            invalidCount++;
-            continue;
-        }
-        if (hasVk) {
-            const t = (c.vaultKey as string).trim();
-            if (t.length > BACKEND_CREDENTIAL_FIELD_MAX_LEN || !hasNoDisallowedCredentialChars(t, false)) {
-                invalidCount++;
-                continue;
-            }
-        }
-        if (hasDn) {
-            const t = (c.displayName as string).trim();
-            if (t.length > BACKEND_CREDENTIAL_FIELD_MAX_LEN || !hasNoDisallowedCredentialChars(t, true)) {
-                invalidCount++;
-                continue;
-            }
-        }
-        validRows.push(cred);
-    }
-    return { validRows, invalidCount };
-}
-
-/** Validates `requiredCredentials` string entries from the backend. */
-function partitionValidatedRequiredCredentialStrings(arr: unknown): { strings: string[]; invalidCount: number } {
-    if (!Array.isArray(arr)) return { strings: [], invalidCount: 0 };
-    const strings: string[] = [];
-    let invalidCount = 0;
-    for (const item of arr) {
-        if (typeof item !== 'string') {
-            invalidCount++;
-            continue;
-        }
-        const t = item.trim();
-        if (t.length === 0 || t.length > BACKEND_CREDENTIAL_FIELD_MAX_LEN || !hasNoDisallowedCredentialChars(t, false)) {
-            invalidCount++;
-            continue;
-        }
-        strings.push(t);
-    }
-    return { strings, invalidCount };
-}
-
 function groupQuestionsByNode(questions: any[]) {
     const grouped = new Map<string, { nodeLabel: string; nodeType: string; fields: any[] }>();
     questions.forEach((q: any) => {
@@ -251,214 +186,7 @@ function groupQuestionsByNode(questions: any[]) {
     return Array.from(grouped.entries()).map(([nodeId, value]) => ({ nodeId, ...value }));
 }
 
-type FieldDesc = {
-    what: string;
-    setupSummary?: string;
-    you: string;
-    aiBuild: string;
-    aiRun: string;
-    example: string;
-    actionableExample?: {
-        value: unknown;
-        displayValue?: string;
-        canApply?: boolean;
-        applyMode?: 'buildtime_ai_once';
-        reason?: string;
-        source?: 'ai_field_guidance' | 'deterministic_field_guidance';
-    };
-    needed?: string;
-    bestOwner?: string;
-    dataImpact?: string;
-    offBehavior?: string;
-    emptyBehavior?: string;
-    defaultBehaviorLabel?: string;
-    recommendedOwner?: 'You' | 'AI Build' | 'AI Runtime';
-    ownerReason?: string;
-    validationConfidence?: 'high' | 'medium' | 'low';
-    warnings?: string[];
-    safeValueSuggestion?: string;
-};
 type FieldDescMap = Record<string, FieldDesc>;
-
-function humanizeFieldName(fieldName: string): string {
-    return String(fieldName || 'this field')
-        .replace(/_/g, ' ')
-        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-        .trim()
-        .replace(/\s+/g, ' ')
-        .replace(/^./, (c) => c.toUpperCase());
-}
-
-function findFieldDocForQuestion(question: Record<string, any>): any | null {
-    const nodeType = String(question.nodeType || '').trim();
-    const fieldName = String(question.fieldName || '').trim();
-    if (!nodeType || !fieldName) return null;
-    return findFieldDocField({
-        nodeType,
-        fieldKey: fieldName,
-        operation: question.operation || question.action || question.operationValue,
-        resource: question.resource,
-        config: question.config || question.nodeConfig || {
-            operation: question.operation || question.action || question.operationValue,
-            resource: question.resource,
-        },
-    });
-}
-
-function buildDeterministicFieldExample(question: Record<string, any>, fieldDoc: any | null): string {
-    const raw =
-        question.exampleValue ??
-        question.example ??
-        fieldDoc?.example ??
-        fieldDoc?.placeholder ??
-        question.defaultValue ??
-        fieldDoc?.defaultValue;
-    const value = raw === undefined || raw === null ? '' : String(raw).trim();
-    if (value) return `Example: ${value}`;
-    const fieldName = String(question.fieldName || '');
-    if (/spreadsheet/i.test(fieldName)) return 'Example: use the ID between /d/ and /edit in the Google Sheet URL.';
-    if (/sheet.*name|tab/i.test(fieldName)) return 'Example: Sheet1 or Leads.';
-    if (/range/i.test(fieldName)) return 'Example: A1:D100 reads columns A through D.';
-    if (/operation|action/i.test(fieldName)) return 'Example: choose read when the workflow needs existing data.';
-    return 'Example: set the value that matches the workflow you are building.';
-}
-
-function normalizeSummarySentence(value: unknown): string {
-    const text = String(value || '').replace(/\s+/g, ' ').trim();
-    if (!text) return '';
-    return /[.!?]$/.test(text) ? text : `${text}.`;
-}
-
-function stripConditionLead(value: string): string {
-    return String(value || '')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .replace(/^if\s+(?:this\s+)?(?:field\s+)?(?:is\s+)?(?:enabled\s+but\s+)?empty,?\s*/i, '')
-        .replace(/^if\s+empty,?\s*/i, '')
-        .replace(/^if\s+(?:this\s+)?(?:field\s+)?(?:is\s+)?off,?\s*/i, '')
-        .trim();
-}
-
-function lowerFirst(value: string): string {
-    if (!value) return value;
-    return value.charAt(0).toLowerCase() + value.slice(1);
-}
-
-function buildFallbackSetupSummary(args: {
-    what: string;
-    requiredText: string;
-    emptyBehavior: string;
-    recommendedOwner: 'You' | 'AI Build' | 'AI Runtime';
-    ownerReason: string;
-    actionableExample?: FieldDesc['actionableExample'];
-}) {
-    const sentences: string[] = [];
-    const seen = new Set<string>();
-    const push = (value: unknown) => {
-        const sentence = normalizeSummarySentence(value);
-        const key = sentence.toLowerCase();
-        if (!sentence || seen.has(key)) return;
-        seen.add(key);
-        sentences.push(sentence);
-    };
-
-    push(args.what);
-    const emptyText = stripConditionLead(args.emptyBehavior);
-    push(emptyText ? `${args.requiredText} When no value is set, ${lowerFirst(emptyText)}` : args.requiredText);
-    push(`Recommended owner: ${args.recommendedOwner}. ${args.ownerReason}`);
-    if (args.actionableExample?.canApply) {
-        push('A safe suggested value is available below and can be applied as AI Build.');
-    } else if (args.actionableExample?.reason && !/no safe typed example/i.test(args.actionableExample.reason)) {
-        push(args.actionableExample.reason);
-    }
-
-    return sentences.slice(0, 4).join(' ');
-}
-
-function buildFieldOwnershipCopy(
-    question: Record<string, any>,
-    aiFieldDesc: FieldDesc | null,
-    opts: {
-        selectedMode?: string;
-        fieldEnabled?: boolean;
-        locked?: boolean;
-    } = {}
-) {
-    const label = String(question.text || question.label || humanizeFieldName(question.fieldName || ''));
-    const fieldName = String(question.fieldName || '').trim();
-    const fieldDoc = findFieldDocForQuestion(question);
-    const humanField = humanizeFieldName(fieldName).toLowerCase();
-    const fieldPurpose = String(
-        fieldDoc?.description || question.helpText || question.description || ''
-    ).trim();
-    const what =
-        aiFieldDesc?.what ||
-        (fieldPurpose
-            ? fieldPurpose
-            : `${label} controls the ${humanField} input for this step.`);
-    const example = aiFieldDesc?.example || buildDeterministicFieldExample(question, fieldDoc);
-    const you =
-        aiFieldDesc?.you ||
-        `You provide this value manually and it stays fixed for every run — right for a specific ${humanField} that won't change.`;
-    const aiBuild =
-        aiFieldDesc?.aiBuild && aiFieldDesc.aiBuild !== 'N/A' && aiFieldDesc.aiBuild !== 'Not available for this field.'
-            ? aiFieldDesc.aiBuild
-            : `AI will determine this ${humanField} once during workflow setup, then reuse it on every run.`;
-    const aiRun =
-        aiFieldDesc?.aiRun && aiFieldDesc.aiRun !== 'N/A' && aiFieldDesc.aiRun !== 'Not available for this field.'
-            ? aiFieldDesc.aiRun
-            : `AI will decide this ${humanField} fresh on every run from the live data flowing through the workflow.`;
-    const emptyBehavior =
-        aiFieldDesc?.emptyBehavior ||
-        (question.required === false
-            ? `If empty, this optional ${humanField} setting is skipped unless this workflow specifically needs it.`
-            : `If empty, this step may fail because ${humanField} is required before the workflow can run.`);
-    const offBehavior =
-        aiFieldDesc?.offBehavior ||
-        (question.required === false
-            ? `If off, this ${humanField} input is not included in setup. ${emptyBehavior}`
-            : `If off, this step will still need ${humanField} before the workflow can run.`);
-    const toggleOff = offBehavior;
-    const requiredText = aiFieldDesc?.needed || (
-        question.required === false
-            ? `Leave this off only if this workflow does not need a custom ${humanField}.`
-            : `Toggle this on and enter the value. This field is required for the step to work.`
-    );
-    const dataImpact = aiFieldDesc?.dataImpact || (
-        opts.fieldEnabled === false
-            ? `Because it is off, this input will not shape how this step handles data yet.`
-            : `When enabled, this input changes how this step reads, filters, writes, or prepares data for the next step.`
-    );
-    const recommendedOwner = aiFieldDesc?.recommendedOwner || (opts.selectedMode === 'runtime_ai' ? 'AI Runtime' : opts.selectedMode === 'buildtime_ai_once' ? 'AI Build' : 'You');
-    const ownerReason = aiFieldDesc?.ownerReason || 'This recommendation follows the field type, selected operation, and available AI ownership modes.';
-    const setupSummary = aiFieldDesc?.setupSummary || buildFallbackSetupSummary({
-        what,
-        requiredText,
-        emptyBehavior,
-        recommendedOwner,
-        ownerReason,
-        actionableExample: aiFieldDesc?.actionableExample,
-    });
-    return {
-        what,
-        setupSummary,
-        you,
-        aiBuild,
-        aiRun,
-        example,
-        toggleOff,
-        requiredText,
-        dataImpact,
-        offBehavior,
-        emptyBehavior,
-        defaultBehaviorLabel: aiFieldDesc?.defaultBehaviorLabel || (question.required === false ? 'Optional setting skipped' : 'Required value'),
-        recommendedOwner,
-        ownerReason,
-        validationConfidence: aiFieldDesc?.validationConfidence || 'medium',
-        warnings: Array.isArray(aiFieldDesc?.warnings) ? aiFieldDesc.warnings : [],
-        safeValueSuggestion: aiFieldDesc?.safeValueSuggestion,
-    };
-}
 
 function mergeBuildAiUsageSnapshot(existing: any, delta: any) {
     if (!delta || typeof delta !== 'object' || !delta.totals || Number(delta.totals.callCount || 0) <= 0) {
@@ -581,18 +309,6 @@ interface CapabilityOptionStep {
     ambiguous?: boolean;
     reason?: string;
 }
-
-/** Mirrors selectedVariationMeta shape in AutonomousAgentWizard */
-type WizardSelectedVariationMeta = {
-    id: string;
-    prompt: string;
-    keywords?: string[];
-    matchedKeywords?: string[];
-    title?: string;
-    strategy?: 'registry_minimal' | 'registry_extended' | 'keyword_minimal' | 'keyword_extended';
-    nodes?: string[];
-    requiredNodeTypes?: string[];
-} | null;
 
 type SummaryV2 = {
     graphOverview: {
@@ -817,80 +533,6 @@ function resolveCapabilitySelections(
     }
 
     return { byStep };
-}
-
-/**
- * Single source of truth for POST /api/generate-workflow (mode: create).
- * Must match for streaming and non-streaming fallback so plan-driven create is not dropped.
- */
-function buildGenerateWorkflowCreateBody(params: {
-    finalPrompt: string;
-    originalPrompt: string;
-    config: Record<string, unknown>;
-    planRegistryTags: string[];
-
-    planMandatoryNodeTypes: string[];
-    planNodeHints: string[];
-    selectedVariationMeta: WizardSelectedVariationMeta;
-    capabilitySelectionsByStep: Record<string, string[]>;
-    capabilityDefaultConfirmStepIds: string[];
-    existingWorkflow?: { nodes: any[]; edges: any[] } | null;
-}): Record<string, unknown> {
-    const {
-        finalPrompt,
-        originalPrompt,
-        config,
-        planRegistryTags,
-        planMandatoryNodeTypes,
-        planNodeHints,
-        selectedVariationMeta,
-        capabilitySelectionsByStep,
-        capabilityDefaultConfirmStepIds,
-        existingWorkflow,
-    } = params;
-
-    const chain = planNodeHints.filter((x) => typeof x === 'string' && x.trim().length > 0);
-
-    return {
-        prompt: finalPrompt,
-        mode: 'create',
-        config,
-        originalPrompt: originalPrompt || finalPrompt,
-        selectedVariationId: selectedVariationMeta?.id ?? null,
-        selectedStructuredPrompt: finalPrompt,
-        // Use original user prompt as confirmedStructuredPrompt ? not the full structured summary
-        // which contains registry contract text that causes false node detection
-        confirmedStructuredPrompt: originalPrompt || finalPrompt,
-        registryTags:
-            planRegistryTags.length > 0 ? planRegistryTags : selectedVariationMeta?.keywords || [],
-        mandatoryNodeTypes:
-            planMandatoryNodeTypes.length > 0
-                ? planMandatoryNodeTypes
-                : selectedVariationMeta?.nodes && selectedVariationMeta.nodes.length > 0
-                  ? selectedVariationMeta.nodes
-                  : selectedVariationMeta?.keywords || [],
-        planProposedNodeChain: chain.length > 0 ? chain : undefined,
-        planMandatoryNodeTypes: planMandatoryNodeTypes.length > 0 ? planMandatoryNodeTypes : undefined,
-        planRegistryTags: planRegistryTags.length > 0 ? planRegistryTags : undefined,
-        selectedVariant: selectedVariationMeta
-            ? {
-                  strategy: selectedVariationMeta.strategy ?? undefined,
-                  nodes: selectedVariationMeta.nodes ?? selectedVariationMeta.keywords ?? undefined,
-                  requiredNodeTypes:
-                      selectedVariationMeta.requiredNodeTypes ??
-                      selectedVariationMeta.nodes ??
-                      selectedVariationMeta.keywords ??
-                      undefined,
-              }
-            : undefined,
-        capabilitySelectionsByStep,
-        capabilityDefaultConfirmStepIds,
-        // Pass existing workflow so the backend merges AI-assigned field values
-        // instead of regenerating from scratch on continuation requests.
-        ...(existingWorkflow && existingWorkflow.nodes && existingWorkflow.nodes.length > 0
-            ? { existingWorkflow: { nodes: existingWorkflow.nodes, edges: existingWorkflow.edges } }
-            : {}),
-    };
 }
 
 /**

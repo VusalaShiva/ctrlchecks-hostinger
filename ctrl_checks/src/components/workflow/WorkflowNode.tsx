@@ -32,6 +32,7 @@ type WorkflowNodeProps = Node<NodeData>;
 const WorkflowNode = memo(({ data, selected, id }: NodeProps<WorkflowNodeProps>) => {
   const { openDebug } = useDebugStore();
   const isAiEditedHighlight = useWorkflowStore((s) => s.aiEditedNodeIds.includes(id));
+  const nodeError = useWorkflowStore((s) => s.nodeErrors[id]);
   const { theme } = useTheme();
   const isLight = theme === 'light';
 
@@ -187,10 +188,20 @@ const WorkflowNode = memo(({ data, selected, id }: NodeProps<WorkflowNodeProps>)
       )}
       {status === 'error' && (
         <>
-          <div className="absolute -top-2 -right-2 bg-background rounded-full p-0.5 shadow-sm border border-border z-10">
+          <div
+            className="absolute -top-2 -right-2 bg-background rounded-full p-0.5 shadow-sm border border-border z-10 cursor-help"
+            title={nodeError || 'Node execution failed'}
+          >
             <XCircle className="h-4 w-4 text-red-500" />
           </div>
-          {/* Error indicator in bottom-right corner for AI Agent */}
+          {nodeError && (
+            <div
+              className="absolute -bottom-7 left-0 right-0 z-20 mx-1 px-2 py-1 rounded text-[10px] leading-tight text-white bg-red-600/90 shadow border border-red-500/40 truncate"
+              title={nodeError}
+            >
+              {nodeError}
+            </div>
+          )}
           {isAIAgentNode && (
             <div className="absolute bottom-2 right-2 z-10">
               <div className="bg-red-500 rounded-sm p-0.5">

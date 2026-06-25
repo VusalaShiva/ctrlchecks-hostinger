@@ -6,7 +6,7 @@ import { awsClient } from '@/integrations/aws/client';
 import { ENDPOINTS } from '@/config/endpoints';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Copy, ExternalLink, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Copy, ExternalLink, ChevronRight, ChevronLeft, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { NodeTypeDefinition } from '@/components/workflow/nodeTypes';
 import WorkflowHeader from '@/components/workflow/WorkflowHeader';
@@ -35,6 +35,7 @@ const WorkflowCanvas = lazy(() => import('@/components/workflow/WorkflowCanvas')
 const PropertiesPanel = lazy(() => import('@/components/workflow/PropertiesPanel'));
 const ExecutionConsole = lazy(() => import('@/components/workflow/ExecutionConsole'));
 const DebugPanel = lazy(() => import('@/components/workflow/debug/DebugPanel'));
+const WorkflowVersionPanel = lazy(() => import('@/components/workflow/WorkflowVersionPanel'));
 
 type LastResolvedInputsMap = Record<
   string,
@@ -65,6 +66,7 @@ export default function WorkflowBuilder() {
   const [executionNotificationResult, setExecutionNotificationResult] = useState<ExecutionResult | null>(null);
   const [consoleExpanded, setConsoleExpanded] = useState(false);
   const [nodeLibraryOpen, setNodeLibraryOpen] = useState(true);
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [propertiesPanelOpen, setPropertiesPanelOpen] = useState(true);
   const [lastResolvedInputs, setLastResolvedInputs] = useState<LastResolvedInputsMap>({});
   const [reliabilityStatus, setReliabilityStatus] = useState<ReliabilityUiState | null>(null);
@@ -1354,6 +1356,35 @@ export default function WorkflowBuilder() {
             {/* Central Canvas Area */}
             <div className="relative h-full min-h-0 min-w-0 flex-[1_1_0%] overflow-hidden">
               <WorkflowCanvas />
+              {/* Version History toggle button */}
+              {id && id !== 'new' && (
+                <button
+                  type="button"
+                  onClick={() => setShowVersionHistory((v) => !v)}
+                  className={cn(
+                    'absolute bottom-4 right-4 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border shadow-sm transition-colors',
+                    showVersionHistory
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-card text-muted-foreground border-border hover:text-foreground hover:border-foreground/40',
+                  )}
+                  title="Version history"
+                >
+                  <History className="h-3.5 w-3.5" />
+                  History
+                </button>
+              )}
+              {/* Version History panel */}
+              {showVersionHistory && id && id !== 'new' && (
+                <WorkflowVersionPanel
+                  workflowId={id}
+                  onRestore={(restoredNodes, restoredEdges) => {
+                    const store = useWorkflowStore.getState();
+                    store.setNodes(restoredNodes);
+                    store.setEdges(restoredEdges);
+                  }}
+                  onClose={() => setShowVersionHistory(false)}
+                />
+              )}
             </div>
 
             {/* Right Panel - Properties */}

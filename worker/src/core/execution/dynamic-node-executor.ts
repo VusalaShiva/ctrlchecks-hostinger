@@ -62,6 +62,7 @@ import {
 } from '../operations/field-policy-resolver';
 import { config as runtimeConfig } from '../config';
 import { verifyAndRepairNodeOutput } from '../../services/ai/ai-output-verifier';
+import { Sentry } from '../sentry';
 
 /** Stable nodeOutputs cache keys — see `worker/docs/OBSERVABILITY_CONTRACT.md`. */
 export const EXECUTION_OBSERVABILITY_KEYS = {
@@ -1031,7 +1032,10 @@ export async function executeNodeDynamically(context: DynamicExecutionContext): 
 
   // Step 8: Execute node using definition.execute() (NO hardcoded logic)
   try {
-    const result = await definition.execute(execContext);
+    const result = await Sentry.startSpan(
+      { name: `node.${nodeType}`, op: 'node.execute', attributes: { nodeType, nodeId: node.id, workflowId } },
+      () => definition.execute(execContext),
+    );
     if (
       result.metadata?.operationStatus ||
       result.metadata?.acknowledgementStatus ||

@@ -74,6 +74,12 @@ export function isRuntimeEmptyValue(value: unknown): boolean {
     if (['v', 'n/a', 'na', 'none', 'null', 'undefined', 'not configured'].includes(lower)) {
       return true;
     }
+    // A value that starts with a real URL scheme is never placeholder-like regardless of
+    // what words appear in the domain (e.g. jsonplaceholder.typicode.com is a real API).
+    // Only reject URLs that contain unresolved template tokens like {{url}}.
+    if (/^https?:\/\//i.test(trimmed)) {
+      return /\{\{[^}]+\}\}/i.test(trimmed);
+    }
     return PLACEHOLDER_TEXT_RE.test(trimmed);
   }
   if (Array.isArray(value)) return value.length === 0;

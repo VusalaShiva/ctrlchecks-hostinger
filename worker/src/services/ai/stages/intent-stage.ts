@@ -118,7 +118,8 @@ export async function runIntentStage(
     const promptTokens = Math.ceil(systemPrompt.length / 4);
     const completionTokens = Math.ceil(text.length / 4);
     logger.info({ event: 'ai_pipeline_stage_end', stage: 'intent', correlationId, outputSummary: `actions=${parsed.actions.length}, dataFlows=${parsed.dataFlows.length}`, durationMs });
-    return { ok: true, intent: { ...parsed, originalPrompt: userPrompt }, durationMs, llmCall: { model, temperature, promptTokens, completionTokens } };
+    const corrected = correctIntentTriggerType({ ...parsed, originalPrompt: userPrompt }, userPrompt);
+    return { ok: true, intent: corrected, durationMs, llmCall: { model, temperature, promptTokens, completionTokens } };
   }
 
   // Retry once with schema reminder
@@ -143,7 +144,8 @@ export async function runIntentStage(
     const promptTokens = Math.ceil(systemPrompt.length / 4);
     const completionTokens = Math.ceil(text2.length / 4);
     logger.info({ event: 'ai_pipeline_stage_end', stage: 'intent', correlationId, outputSummary: `actions=${parsed2.actions.length} (retry)`, durationMs: Date.now() - startedAt });
-    return { ok: true, intent: { ...parsed2, originalPrompt: userPrompt }, durationMs: Date.now() - startedAt, llmCall: { model, temperature, promptTokens, completionTokens } };
+    const corrected2 = correctIntentTriggerType({ ...parsed2, originalPrompt: userPrompt }, userPrompt);
+    return { ok: true, intent: corrected2, durationMs: Date.now() - startedAt, llmCall: { model, temperature, promptTokens, completionTokens } };
   }
 
   logger.error({ event: 'ai_pipeline_stage_error', stage: 'intent', correlationId, error: 'INVALID_LLM_RESPONSE', llmResponse: text2 });
@@ -169,7 +171,8 @@ function buildFallbackIntentStageResult(params: {
   correlationId?: string;
   reason: string;
 }): IntentStageResult {
-  const fallbackIntent = buildDeterministicIntent(params.userPrompt);
+  const rawFallbackIntent = buildDeterministicIntent(params.userPrompt);
+  const fallbackIntent = correctIntentTriggerType(rawFallbackIntent, params.userPrompt);
   logger.warn({
     event: 'ai_pipeline_stage_fallback',
     stage: 'intent',
@@ -298,13 +301,42 @@ function buildDeterministicIntent(userPrompt: string): StructuredIntent {
   };
 }
 
+/**
+ * Signals that a prompt describes OUTBOUND data-fetching rather than inbound-receive.
+ * Used to guard both trigger inference and post-LLM correction.
+ */
+const OUTBOUND_FETCH_RE = /\b(get|fetch|read|call|retrieve|pull|request.*from|data.*from|from.*url|from.*api|from.*endpoint)\b/;
+const INBOUND_RECEIVE_RE = /\b(incoming webhook|receive.*request|inbound|when.*receive|when.*called|on.*webhook|endpoint.*receives|posts.*to.*me|sends.*to.*me)\b/;
+
 function inferTriggerType(prompt: string): StructuredIntent['triggerType'] {
   const text = prompt.toLowerCase();
-  if (/\b(webhook|api call|http request|incoming request)\b/.test(text)) return 'webhook';
+  // webhook ONLY for explicit inbound-receive patterns. "api call" and "http request"
+  // describe OUTBOUND operations (fetch data), not inbound triggers — never map those to webhook.
+  if (INBOUND_RECEIVE_RE.test(text)) return 'webhook';
+  if (/\bwebhook\b/.test(text) && !OUTBOUND_FETCH_RE.test(text)) return 'webhook';
   if (/\b(form|submission|submitted)\b/.test(text)) return 'form';
   if (/\b(chat|message from user|conversation)\b/.test(text)) return 'chat_trigger';
   if (/\b(schedule|scheduled|every|daily|weekly|monthly|cron)\b/.test(text)) return 'schedule';
   return 'manual_trigger';
+}
+
+/**
+ * Post-process a parsed intent (from LLM or fallback) and correct a misclassified
+ * webhook trigger. If the LLM returned webhook but the prompt describes outbound fetch
+ * (get/fetch/read/call a URL) with no inbound-receive language, override to manual_trigger.
+ *
+ * This is the universal catch-all: works regardless of LLM variation or user phrasing.
+ */
+function correctIntentTriggerType(intent: StructuredIntent, originalPrompt: string): StructuredIntent {
+  if (intent.triggerType !== 'webhook') return intent;
+  const text = originalPrompt.toLowerCase();
+  if (INBOUND_RECEIVE_RE.test(text)) return intent; // genuinely inbound — keep webhook
+  // If any outbound-fetch keyword is present and no inbound-receive language — downgrade
+  const actionText = (intent.actions || []).join(' ').toLowerCase();
+  if (OUTBOUND_FETCH_RE.test(text) || OUTBOUND_FETCH_RE.test(actionText)) {
+    return { ...intent, triggerType: 'manual_trigger' };
+  }
+  return intent;
 }
 
 function extractActionPhrases(prompt: string): string[] {

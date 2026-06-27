@@ -1,4 +1,5 @@
 import { NodeDefinition } from '../../core/types/node-definition';
+import { randomUUID } from 'crypto';
 
 export const webhookTriggerNodeDefinition: NodeDefinition = {
   type: 'webhook',
@@ -51,6 +52,8 @@ export const webhookTriggerNodeDefinition: NodeDefinition = {
 
   defaultInputs: () => ({
     method: 'POST',
-    path: '',
+    // Auto-generate a unique path so runtime never sees an empty/invalid path.
+    // Users can rename it; the important thing is it's always a valid slug.
+    path: `/webhook/${randomUUID().slice(0, 8)}`,
   }),
 };

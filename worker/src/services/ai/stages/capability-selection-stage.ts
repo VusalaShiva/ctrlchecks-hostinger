@@ -724,8 +724,11 @@ function isActionCoveredByTrigger(action: string, triggerType: StructuredIntent[
       && !/\b(send|email|notify|message|post|publish|update|create|mark|set|fetch|get|read|query|summarize|analyze)\b/.test(text);
   }
   if (triggerType === 'webhook') {
-    return /\b(webhook|incoming request|api call|http request)\b/.test(text)
-      && !/\b(send|email|notify|message|post|publish|update|create|fetch|get|read|query|summarize|analyze)\b/.test(text);
+    // Only suppress the action if it describes receiving/inbound data (not outbound fetch).
+    // "http request", "api call" in an action phrase means the workflow CALLS an external URL —
+    // that must become an http_request node, not be swallowed by the webhook trigger.
+    return /\b(incoming webhook|receive.*request|inbound|on.*webhook)\b/.test(text)
+      && !/\b(send|email|notify|message|post|publish|update|create|fetch|get|read|query|summarize|analyze|call|url|http)\b/.test(text);
   }
   if (triggerType === 'schedule') {
     return /\b(schedule|scheduled|every|daily|weekly|monthly|cron)\b/.test(text)

@@ -781,7 +781,10 @@ class UnifiedGraphOrchestratorImpl implements UnifiedGraphOrchestrator {
     }
 
     const ifElseFormBinding = validateIfElseConditionsAgainstUpstreamForm(currentWorkflow);
-    errors.push(...ifElseFormBinding.errors);
+    // Downgrade form-binding mismatches to warnings: AI may generate $json.user_age for a field
+    // keyed "age" — semantic drift is common and the workflow is still structurally valid.
+    // Blocking saves on field-name heuristics causes 422s for valid AI-generated workflows.
+    warnings.push(...ifElseFormBinding.errors);
 
     // Terminal mode compatibility:
     // - log_output_preferred (default): keep backward compatibility, but allow workflows that end at output sinks.

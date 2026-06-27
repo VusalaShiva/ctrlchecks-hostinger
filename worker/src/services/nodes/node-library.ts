@@ -966,9 +966,21 @@ export class NodeLibrary {
         continue;
       }
 
-      const value = config[fieldName];
+      let value = config[fieldName];
+      // Coerce AI-generated string values to the correct primitive type before validation.
+      // Gemini property population outputs "10000" (string) for number fields and
+      // "true"/"false" (string) for boolean fields — coerce silently rather than error.
+      const fieldType = (fieldInfo as any)?.type;
+      if (typeof value === 'string' && value !== '') {
+        if (fieldType === 'number') {
+          const coerced = Number(value);
+          if (!isNaN(coerced)) { config[fieldName] = coerced; value = coerced; }
+        } else if (fieldType === 'boolean') {
+          if (value === 'true' || value === '1')  { config[fieldName] = true;  value = true;  }
+          if (value === 'false' || value === '0') { config[fieldName] = false; value = false; }
+        }
+      }
       if (value !== undefined && value !== null && value !== '') {
-        const fieldType = (fieldInfo as any)?.type;
         if (fieldType === 'string' && typeof value !== 'string') {
           errors.push(`Field "${fieldName}" must be a string, got ${typeof value}`);
         } else if (fieldType === 'number' && typeof value !== 'number') {

@@ -18,6 +18,35 @@
 import { z } from 'zod';
 
 // ============================================================================
+// Universal AI-output type coercers
+//
+// The AI (Gemini) generates JSON where numeric fields come out as strings
+// (e.g. timeout: "10000") and boolean fields as "true"/"false" strings.
+// These helpers wrap any Zod schema with a preprocess step so string→number
+// and string→boolean coercion happens automatically for EVERY node schema.
+// ============================================================================
+
+/** Coerce string "123" → number 123 before Zod validates a number field. */
+function numStr<T extends z.ZodNumber>(schema: T) {
+  return z.preprocess(
+    (v) => (typeof v === 'string' && v.trim() !== '' ? Number(v.trim()) : v),
+    schema,
+  ) as z.ZodEffects<T>;
+}
+
+/** Coerce string "true"/"false" → boolean before Zod validates a boolean field. */
+function boolStr<T extends z.ZodBoolean>(schema: T) {
+  return z.preprocess(
+    (v) => {
+      if (v === 'true'  || v === '1') return true;
+      if (v === 'false' || v === '0') return false;
+      return v;
+    },
+    schema,
+  ) as z.ZodEffects<T>;
+}
+
+// ============================================================================
 // Base Schemas
 // ============================================================================
 
@@ -67,10 +96,10 @@ export const WorkflowContextSchema = z.object({
  */
 export const JavaScriptNodeConfigSchema = BaseNodeConfigSchema.extend({
   code: z.string().min(1, 'Code is required and cannot be empty'),
-  timeout: z.number()
+  timeout: numStr(z.number()
     .int('Timeout must be an integer')
     .min(100, 'Timeout must be at least 100ms')
-    .max(30000, 'Timeout cannot exceed 30 seconds')
+    .max(30000, 'Timeout cannot exceed 30 seconds'))
     .optional()
     .default(5000),
 });
@@ -89,17 +118,25 @@ export const HttpRequestNodeConfigSchema = BaseNodeConfigSchema.extend({
     message: 'Method must be one of: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS',
   })
     .default('GET'),
-  headers: z.record(z.string(), z.string())
+  headers: z.record(z.string(), z.unknown())
     .optional()
     .default({}),
   body: z.unknown().optional(),
+  // Accept both "query" and "qs" (node-library uses "qs", Zod schema used "query")
   query: z.record(z.string(), z.unknown()).optional(),
-  timeout: z.number()
+  qs: z.record(z.string(), z.unknown()).optional(),
+  timeout: numStr(z.number()
     .int('Timeout must be an integer')
-    .min(1000, 'Timeout must be at least 1 second')
-    .max(60000, 'Timeout cannot exceed 60 seconds')
+    .min(100, 'Timeout must be at least 100ms')
+    .max(300000, 'Timeout cannot exceed 5 minutes'))
     .optional()
-    .default(30000),
+    .default(10000),
+  retryOnFail: boolStr(z.boolean()).optional().default(true),
+  maxRetries: numStr(z.number()
+    .int('Max retries must be an integer')
+    .min(0).max(10))
+    .optional()
+    .default(3),
 });
 
 export type HttpRequestNodeConfig = z.infer<typeof HttpRequestNodeConfigSchema>;
@@ -120,15 +157,15 @@ export const AiAgentNodeConfigSchema = BaseNodeConfigSchema.extend({
   model: z.string()
     .min(1, 'Model name is required')
     .optional(),
-  temperature: z.number()
+  temperature: numStr(z.number()
     .min(0, 'Temperature must be at least 0')
-    .max(2, 'Temperature cannot exceed 2')
+    .max(2, 'Temperature cannot exceed 2'))
     .optional()
     .default(0.7),
-  maxTokens: z.number()
+  maxTokens: numStr(z.number()
     .int('Max tokens must be an integer')
     .min(1, 'Max tokens must be at least 1')
-    .max(100000, 'Max tokens cannot exceed 100,000')
+    .max(100000, 'Max tokens cannot exceed 100,000'))
     .optional(),
 });
 
@@ -174,13 +211,13 @@ export const MathNodeConfigSchema = BaseNodeConfigSchema.extend({
   operation: z.enum(['add', 'subtract', 'multiply', 'divide', 'power', 'modulo'], {
     message: 'Operation must be one of: add, subtract, multiply, divide, power, modulo',
   }),
-  values: z.array(z.number())
+  values: z.array(numStr(z.number()))
     .min(2, 'At least 2 values are required for math operations')
     .optional(),
-  precision: z.number()
+  precision: numStr(z.number()
     .int('Precision must be an integer')
     .min(0, 'Precision must be at least 0')
-    .max(10, 'Precision cannot exceed 10')
+    .max(10, 'Precision cannot exceed 10'))
     .optional()
     .default(2),
 });
@@ -220,15 +257,10 @@ export const OpenAIGPTNodeConfigSchema = BaseNodeConfigSchema.extend({
   model: z.string()
     .min(1, 'Model name is required')
     .default('gpt-4o'),
-  temperature: z.number()
-    .min(0)
-    .max(2)
+  temperature: numStr(z.number().min(0).max(2))
     .optional()
     .default(0.7),
-  maxTokens: z.number()
-    .int()
-    .min(1)
-    .max(100000)
+  maxTokens: numStr(z.number().int().min(1).max(100000))
     .optional(),
 });
 
@@ -243,15 +275,10 @@ export const AnthropicClaudeNodeConfigSchema = BaseNodeConfigSchema.extend({
   model: z.string()
     .min(1, 'Model name is required')
     .default('claude-3-5-sonnet-20241022'),
-  temperature: z.number()
-    .min(0)
-    .max(1)
+  temperature: numStr(z.number().min(0).max(1))
     .optional()
     .default(0.7),
-  maxTokens: z.number()
-    .int()
-    .min(1)
-    .max(100000)
+  maxTokens: numStr(z.number().int().min(1).max(100000))
     .optional(),
 });
 
@@ -266,15 +293,10 @@ export const GoogleGeminiNodeConfigSchema = BaseNodeConfigSchema.extend({
   model: z.string()
     .min(1, 'Model name is required')
     .default('gemini-3.1-pro-preview'),
-  temperature: z.number()
-    .min(0)
-    .max(2)
+  temperature: numStr(z.number().min(0).max(2))
     .optional()
     .default(0.7),
-  maxTokens: z.number()
-    .int()
-    .min(1)
-    .max(100000)
+  maxTokens: numStr(z.number().int().min(1).max(100000))
     .optional(),
 });
 
